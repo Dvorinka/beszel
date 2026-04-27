@@ -10,6 +10,10 @@ const routes = {
 	settings: `/settings/:name?`,
 	forgot_password: `/forgot-password`,
 	request_otp: `/request-otp`,
+	status_pages: `/status-pages`,
+	incidents: `/incidents`,
+	calendar: `/calendar`,
+	monitoring: `/monitoring`,
 } as const
 
 /**

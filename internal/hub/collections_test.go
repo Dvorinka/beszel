@@ -328,8 +328,6 @@ func TestApiCollectionsAuthRules(t *testing.T) {
 	hub, _ := beszelTests.NewTestHub(t.TempDir())
 	defer hub.Cleanup()
 
-	hub.StartHub()
-
 	user1, _ := beszelTests.CreateUser(hub, "user1@example.com", "password")
 	user1Token, _ := user1.NewAuthToken()
 

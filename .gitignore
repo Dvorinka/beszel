@@ -1,27 +1,46 @@
+# IDE
+.idea
 .idea.md
-pb_data
-data
-temp
 .vscode
-beszel-agent
-beszel_data
-beszel_data*
-dist
+
+# Build artifacts
+build/
+dist/
 *.exe
+beszel-agent
+beszel-server
+beszel-test
 internal/cmd/hub/hub
 internal/cmd/agent/agent
 agent.test
-node_modules
-build
-*timestamp*
-.swc
-internal/site/src/locales/**/*.ts
-*.bak
-__debug_*
 agent/lhm/obj
 agent/lhm/bin
 dockerfile_agent_dev
-beszel-server
-beszel-test
-test_output
-.playwright-cli
+
+# Data directories
+pb_data/
+data/
+temp/
+beszel_data/
+beszel_data*
+test_output/
+
+# Node.js
+node_modules/
+.swc
+
+# Generated locales
+internal/site/src/locales/**/*.ts
+
+# Debug
+*.bak
+__debug_*
+*timestamp*
+.playwright-cli/
+
+# Reference code (external projects)
+reference/
+
+# Environment
+.env
+.env.local

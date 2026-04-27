@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/mail"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -198,6 +199,25 @@ func (am *AlertManager) SendAlert(data AlertMessageData) error {
 	if am.IsNotificationSilenced(data.UserID, data.SystemID) {
 		am.hub.Logger().Info("Notification silenced", "user", data.UserID, "system", data.SystemID, "title", data.Title)
 		return nil
+	}
+
+	// check if in maintenance window - suppress alerts if so
+	records, _ := am.hub.FindAllRecords("maintenance_windows",
+		dbx.NewExp("status = {:status} AND start_time <= {:now} AND end_time >= {:now} AND suppress_alerts = true",
+			dbx.Params{"status": "scheduled", "now": time.Now()}),
+	)
+	for _, r := range records {
+		// Check if this alert relates to a monitor or domain in maintenance
+		if data.Link != "" {
+			if monitorID := r.GetString("monitor"); monitorID != "" && strings.Contains(data.Link, monitorID) {
+				am.hub.Logger().Info("Alert suppressed due to maintenance window", "monitor", monitorID)
+				return nil
+			}
+			if domainID := r.GetString("domain"); domainID != "" && strings.Contains(data.Link, domainID) {
+				am.hub.Logger().Info("Alert suppressed due to maintenance window", "domain", domainID)
+				return nil
+			}
+		}
 	}
 
 	// get user settings

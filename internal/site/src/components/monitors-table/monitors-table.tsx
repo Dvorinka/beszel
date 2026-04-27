@@ -3,14 +3,20 @@ import { useStore } from "@nanostores/react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
 	ArrowDownIcon,
+	ArrowUpDownIcon,
 	ArrowUpIcon,
 	CheckCircleIcon,
 	Edit3Icon,
+	EyeIcon,
+	FilterIcon,
 	GlobeIcon,
+	LayoutGridIcon,
+	LayoutListIcon,
 	PauseIcon,
 	PlayIcon,
 	PlusIcon,
 	RefreshCwIcon,
+	Settings2Icon,
 	Trash2Icon,
 	XCircleIcon,
 } from "lucide-react"
@@ -24,16 +30,14 @@ import {
 	CardTitle,
 } from "@/components/ui/card"
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog"
-import {
 	DropdownMenu,
+	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -64,7 +68,7 @@ import {
 	formatUptime,
 	formatPing,
 } from "@/lib/monitors"
-import { cn } from "@/lib/utils"
+import { cn, useBrowserStorage } from "@/lib/utils"
 import { AddMonitorDialog } from "./add-monitor-dialog"
 import { Link } from "@/components/router"
 
@@ -93,6 +97,158 @@ function StatusIndicator({ status }: { status: MonitorStatus }) {
 			<div className={cn("h-2.5 w-2.5 rounded-full", colors[status])} />
 			<Icon className="h-4 w-4 text-muted-foreground" />
 			<span className="capitalize text-sm">{status}</span>
+		</div>
+	)
+}
+
+// Monitor Card component for grid view
+function MonitorCard({
+	monitor,
+	onEdit,
+}: {
+	monitor: Monitor
+	onEdit: (m: Monitor) => void
+}) {
+	const { toast } = useToast()
+	const queryClient = useQueryClient()
+
+	const checkMutation = useMutation({
+		mutationFn: manualCheck,
+		onSuccess: (result) => {
+			toast({
+				title: `Check complete`,
+				description: `${monitor.name} is ${result.status} (${formatPing(result.ping)})`,
+			})
+			queryClient.invalidateQueries({ queryKey: ["monitors"] })
+		},
+	})
+
+	const pauseMutation = useMutation({
+		mutationFn: monitor.status === "paused" ? resumeMonitor : pauseMonitor,
+		onSuccess: () => {
+			toast({
+				title: monitor.status === "paused" ? "Monitor resumed" : "Monitor paused",
+			})
+			queryClient.invalidateQueries({ queryKey: ["monitors"] })
+		},
+	})
+
+	const deleteMutation = useMutation({
+		mutationFn: deleteMonitor,
+		onSuccess: () => {
+			toast({ title: "Monitor deleted" })
+			queryClient.invalidateQueries({ queryKey: ["monitors"] })
+		},
+	})
+
+	return (
+		<div className="rounded-lg border bg-card p-4 space-y-4 hover:shadow-md transition-shadow">
+			<div className="flex items-start justify-between">
+				<Link href={`/monitor/${monitor.id}`} className="flex items-center gap-3 cursor-pointer min-w-0">
+					<div className="shrink-0">
+						<StatusIndicator status={monitor.status} />
+					</div>
+					<div className="min-w-0">
+						<div className="font-medium truncate hover:underline">{monitor.name}</div>
+						<div className="text-xs text-muted-foreground truncate">
+							{monitor.url || monitor.hostname}
+							{monitor.port ? `:${monitor.port}` : ""}
+						</div>
+					</div>
+				</Link>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+							<Edit3Icon className="h-4 w-4" />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end">
+						<DropdownMenuItem onClick={() => onEdit(monitor)}>
+							<Edit3Icon className="mr-2 h-4 w-4" />
+							Edit
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							onClick={() => deleteMutation.mutate(monitor.id)}
+							className="text-destructive"
+						>
+							<Trash2Icon className="mr-2 h-4 w-4" />
+							Delete
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
+
+			<div className="grid grid-cols-2 gap-3 text-sm">
+				<div className="space-y-1">
+					<div className="text-xs text-muted-foreground">Type</div>
+					<div className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium">
+						{getMonitorTypeLabel(monitor.type)}
+					</div>
+				</div>
+				<div className="space-y-1">
+					<div className="text-xs text-muted-foreground">Response</div>
+					<div>
+						{monitor.last_check ? (
+							formatPing(monitor.uptime_stats?.last_ping || 0)
+						) : (
+							<span className="text-muted-foreground">-</span>
+						)}
+					</div>
+				</div>
+				<div className="col-span-2 space-y-1">
+					<div className="text-xs text-muted-foreground">Uptime (24h)</div>
+					<UptimeBar stats={monitor.uptime_stats} />
+				</div>
+			</div>
+
+			<div className="flex items-center gap-2 pt-2 border-t">
+				<TooltipProvider>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="outline"
+								size="sm"
+								className="flex-1"
+								onClick={() => checkMutation.mutate(monitor.id)}
+								disabled={checkMutation.isPending}
+							>
+								<RefreshCwIcon
+									className={cn(
+										"h-4 w-4 mr-1",
+										checkMutation.isPending && "animate-spin"
+									)}
+								/>
+								Check
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>
+							<p>Check now</p>
+						</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
+				<TooltipProvider>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="outline"
+								size="sm"
+								className="flex-1"
+								onClick={() => pauseMutation.mutate(monitor.id)}
+								disabled={pauseMutation.isPending}
+							>
+								{monitor.status === "paused" ? (
+									<><PlayIcon className="h-4 w-4 mr-1" /> Resume</>
+								) : (
+									<><PauseIcon className="h-4 w-4 mr-1" /> Pause</>
+								)}
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>
+							<p>{monitor.status === "paused" ? "Resume" : "Pause"}</p>
+						</TooltipContent>
+					</Tooltip>
+				</TooltipProvider>
+			</div>
 		</div>
 	)
 }
@@ -275,78 +431,160 @@ function MonitorRow({
 	)
 }
 
+type ViewMode = "table" | "grid"
+type StatusFilter = "all" | MonitorStatus
+
 // Main component
 export default memo(function MonitorsTable() {
-	const { t } = useLingui()
+	const { t, i18n } = useLingui()
 	const [filter, setFilter] = useState("")
+	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
 	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 	const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null)
+	
+	const [viewMode, setViewMode] = useBrowserStorage<ViewMode>(
+		"monitorsViewMode",
+		window.innerWidth < 1024 ? "grid" : "table"
+	)
 
 	const { data: monitors = [], isLoading } = useQuery({
 		queryKey: ["monitors"],
 		queryFn: listMonitors,
-		refetchInterval: 30000, // Refresh every 30 seconds
+		refetchInterval: 30000,
 	})
 
+	// Filter by status first
+	const statusFilteredMonitors = useMemo(() => {
+		if (statusFilter === "all") return monitors
+		return monitors.filter((m) => m.status === statusFilter)
+	}, [monitors, statusFilter])
+
+	// Then filter by search text
 	const filteredMonitors = useMemo(() => {
-		if (!filter) return monitors
+		if (!filter) return statusFilteredMonitors
 		const f = filter.toLowerCase()
-		return monitors.filter(
+		return statusFilteredMonitors.filter(
 			(m) =>
 				m.name.toLowerCase().includes(f) ||
 				(m.url || "").toLowerCase().includes(f) ||
 				(m.hostname || "").toLowerCase().includes(f)
 		)
-	}, [monitors, filter])
+	}, [statusFilteredMonitors, filter])
 
 	const stats = useMemo(() => {
 		const total = monitors.length
 		const up = monitors.filter((m) => m.status === "up").length
 		const down = monitors.filter((m) => m.status === "down").length
 		const paused = monitors.filter((m) => m.status === "paused").length
-		return { total, up, down, paused }
+		const pending = monitors.filter((m) => m.status === "pending").length
+		const maintenance = monitors.filter((m) => m.status === "maintenance").length
+		return { total, up, down, paused, pending, maintenance }
 	}, [monitors])
 
 	return (
-		<Card>
-			<CardHeader className="p-4 sm:p-6">
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-					<div>
-						<CardTitle className="text-xl">
-							<Trans>Website & Service Monitoring</Trans>
-						</CardTitle>
-						<CardDescription>
-							<Trans>Monitor websites, APIs, and services</Trans>
-							<span className="ml-2 text-xs">
-								({stats.up} <ArrowUpIcon className="inline h-3 w-3 text-green-500" />
-								{stats.down > 0 && (
-									<>
-										{" "}
-										{stats.down}{" "}
-										<ArrowDownIcon className="inline h-3 w-3 text-red-500" />
-									</>
-								)}
-								{stats.paused > 0 && (
-									<>
-										{" "}
-										{stats.paused} <PauseIcon className="inline h-3 w-3 text-gray-400" />
-									</>
-								)}
-								/ {stats.total})
-							</span>
-						</CardDescription>
-					</div>
-					<div className="flex gap-2">
-						<Input
-							placeholder={t`Search monitors...`}
-							value={filter}
-							onChange={(e) => setFilter(e.target.value)}
-							className="w-full sm:w-64"
-						/>
-						<Button onClick={() => setIsAddDialogOpen(true)}>
+		<Card className="w-full px-3 py-5 sm:py-6 sm:px-6">
+			<CardHeader className="p-0 pb-5">
+				<div className="flex flex-col gap-4">
+					{/* Title row */}
+					<div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+						<div className="flex-1">
+							<CardTitle className="text-xl mb-2 flex items-center gap-2">
+								<GlobeIcon className="h-5 w-5 text-primary" />
+								<Trans>Website & Service Monitoring</Trans>
+							</CardTitle>
+							<CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+								<Trans>Monitor websites, APIs, and services</Trans>
+								<span className="text-xs text-muted-foreground">
+									({stats.up} <ArrowUpIcon className="inline h-3 w-3 text-green-500" />
+									{stats.down > 0 && (
+										<>
+											{" "}
+											{stats.down}{" "}
+											<ArrowDownIcon className="inline h-3 w-3 text-red-500" />
+										</>
+									)}
+									{stats.paused > 0 && (
+										<>
+											{" "}
+											{stats.paused} <PauseIcon className="inline h-3 w-3 text-gray-400" />
+										</>
+									)}
+									/ {stats.total})
+								</span>
+							</CardDescription>
+						</div>
+						<Button onClick={() => setIsAddDialogOpen(true)} className="shrink-0">
 							<PlusIcon className="mr-2 h-4 w-4" />
-							<Trans>Add</Trans>
+							<Trans>Add Monitor</Trans>
 						</Button>
+					</div>
+
+					{/* Filter row */}
+					<div className="flex flex-col sm:flex-row gap-2">
+						<div className="relative flex-1">
+							<Input
+								placeholder={t`Filter monitors...`}
+								onChange={(e) => setFilter(e.target.value)}
+								value={filter}
+								className="w-full"
+							/>
+						</div>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="outline">
+									<Settings2Icon className="me-1.5 size-4 opacity-80" />
+									<Trans>View</Trans>
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="min-w-48">
+								{/* Layout */}
+								<DropdownMenuLabel className="flex items-center gap-2">
+									<LayoutGridIcon className="size-4" />
+									<Trans>Layout</Trans>
+								</DropdownMenuLabel>
+								<DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+									<DropdownMenuRadioItem value="table" className="gap-2">
+										<LayoutListIcon className="size-4" />
+										<Trans>Table</Trans>
+									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="grid" className="gap-2">
+										<LayoutGridIcon className="size-4" />
+										<Trans>Grid</Trans>
+									</DropdownMenuRadioItem>
+								</DropdownMenuRadioGroup>
+								<DropdownMenuSeparator />
+
+								{/* Status Filter */}
+								<DropdownMenuLabel className="flex items-center gap-2">
+									<FilterIcon className="size-4" />
+									<Trans>Status</Trans>
+								</DropdownMenuLabel>
+								<DropdownMenuRadioGroup value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+									<DropdownMenuRadioItem value="all">
+										<Trans>All ({stats.total})</Trans>
+									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="up">
+										<Trans>Up ({stats.up})</Trans>
+									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="down">
+										<Trans>Down ({stats.down})</Trans>
+									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="paused">
+										<Trans>Paused ({stats.paused})</Trans>
+									</DropdownMenuRadioItem>
+									{stats.pending > 0 && (
+										<DropdownMenuRadioItem value="pending">
+											<Trans>Pending ({stats.pending})</Trans>
+										</DropdownMenuRadioItem>
+									)}
+									{stats.maintenance > 0 && (
+										<DropdownMenuRadioItem value="maintenance">
+											<Trans>Maintenance ({stats.maintenance})</Trans>
+										</DropdownMenuRadioItem>
+									)}
+								</DropdownMenuRadioGroup>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 				</div>
 			</CardHeader>
@@ -357,8 +595,8 @@ export default memo(function MonitorsTable() {
 					</div>
 				) : filteredMonitors.length === 0 ? (
 					<div className="p-8 text-center text-muted-foreground">
-						{filter ? (
-							<Trans>No monitors match your search.</Trans>
+						{filter || statusFilter !== "all" ? (
+							<Trans>No monitors match your filters.</Trans>
 						) : (
 							<div>
 								<p className="mb-4">
@@ -371,7 +609,7 @@ export default memo(function MonitorsTable() {
 							</div>
 						)}
 					</div>
-				) : (
+				) : viewMode === "table" ? (
 					<Table>
 						<TableHeader>
 							<TableRow>
@@ -405,6 +643,16 @@ export default memo(function MonitorsTable() {
 							))}
 						</TableBody>
 					</Table>
+				) : (
+					<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+						{filteredMonitors.map((monitor) => (
+							<MonitorCard
+								key={monitor.id}
+								monitor={monitor}
+								onEdit={setEditingMonitor}
+							/>
+						))}
+					</div>
 				)}
 			</CardContent>
 

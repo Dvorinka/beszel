@@ -3,7 +3,9 @@ package export
 import (
 	"encoding/csv"
 	"fmt"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pocketbase/dbx"
@@ -23,6 +25,10 @@ func NewAPIHandler(app core.App) *APIHandler {
 
 // RegisterRoutes registers export API routes
 func (h *APIHandler) RegisterRoutes(se *core.ServeEvent) {
+	// Public Prometheus metrics endpoint
+	se.Router.GET("/metrics", h.getPrometheusMetrics)
+
+	// Protected export routes
 	api := se.Router.Group("/api/beszel/export")
 	api.Bind(apis.RequireAuth())
 
@@ -256,4 +262,95 @@ func formatDateTime(t time.Time) string {
 		return ""
 	}
 	return t.Format("2006-01-02 15:04:05")
+}
+
+// getPrometheusMetrics exports metrics in Prometheus format
+func (h *APIHandler) getPrometheusMetrics(e *core.RequestEvent) error {
+	var output strings.Builder
+
+	// System metrics
+	systems, err := h.app.FindAllRecords("systems")
+	if err == nil {
+		for _, system := range systems {
+			name := system.GetString("name")
+			status := system.GetString("status")
+			statusValue := 0.0
+			if status == "down" {
+				statusValue = 1.0
+			}
+			output.WriteString(fmt.Sprintf("beszel_system_status{name=%q} %g\n", name, statusValue))
+			if cpu := system.Get("cpu"); cpu != nil {
+				output.WriteString(fmt.Sprintf("beszel_system_cpu_usage{name=%q} %v\n", name, cpu))
+			}
+			if mem := system.Get("mem"); mem != nil {
+				output.WriteString(fmt.Sprintf("beszel_system_memory_usage{name=%q} %v\n", name, mem))
+			}
+			if disk := system.Get("disk"); disk != nil {
+				output.WriteString(fmt.Sprintf("beszel_system_disk_usage{name=%q} %v\n", name, disk))
+			}
+		}
+	}
+
+	// Monitor metrics
+	monitors, err := h.app.FindAllRecords("monitors")
+	if err == nil {
+		for _, monitor := range monitors {
+			name := monitor.GetString("name")
+			status := monitor.GetString("status")
+			userID := monitor.GetString("user")
+			statusValue := 0.0
+			switch status {
+			case "down":
+				statusValue = 1.0
+			case "paused":
+				statusValue = 2.0
+			}
+			output.WriteString(fmt.Sprintf("beszel_monitor_status{name=%q,user=%q} %g\n", name, userID, statusValue))
+			if responseTime := monitor.Get("last_response_time"); responseTime != nil {
+				output.WriteString(fmt.Sprintf("beszel_monitor_response_time_ms{name=%q,user=%q} %v\n", name, userID, responseTime))
+			}
+		}
+	}
+
+	// Domain metrics
+	domains, err := h.app.FindAllRecords("domains")
+	if err == nil {
+		for _, domain := range domains {
+			name := domain.GetString("domain_name")
+			status := domain.GetString("status")
+			userID := domain.GetString("user")
+			statusValue := 0.0
+			switch status {
+			case "expiring":
+				statusValue = 1.0
+			case "expired":
+				statusValue = 2.0
+			case "unknown":
+				statusValue = 3.0
+			case "paused":
+				statusValue = 4.0
+			}
+			output.WriteString(fmt.Sprintf("beszel_domain_status{domain=%q,user=%q} %g\n", name, userID, statusValue))
+			if daysUntil := domain.Get("days_until_expiry"); daysUntil != nil {
+				output.WriteString(fmt.Sprintf("beszel_domain_days_until_expiry{domain=%q,user=%q} %v\n", name, userID, daysUntil))
+			}
+			if sslDays := domain.Get("ssl_days_until"); sslDays != nil {
+				output.WriteString(fmt.Sprintf("beszel_domain_ssl_days_until_expiry{domain=%q,user=%q} %v\n", name, userID, sslDays))
+			}
+		}
+	}
+
+	// Incident metrics
+	incidents, err := h.app.FindAllRecords("incidents")
+	if err == nil {
+		activeCount := 0
+		for _, incident := range incidents {
+			if incident.GetString("status") == "active" {
+				activeCount++
+			}
+		}
+		output.WriteString(fmt.Sprintf("beszel_incidents_active %d\n", activeCount))
+	}
+
+	return e.String(http.StatusOK, output.String())
 }

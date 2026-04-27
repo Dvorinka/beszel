@@ -120,6 +120,12 @@ func ClearCollection(t testing.TB, app core.App, collectionName string) error {
 func (h *TestHub) Cleanup() {
 	h.GetAlertManager().Stop()
 	h.GetSystemManager().RemoveAllSystems()
+	if ds := h.GetDomainScheduler(); ds != nil {
+		ds.Stop()
+	}
+	if ms := h.GetMonitorScheduler(); ms != nil {
+		ms.Stop()
+	}
 	h.TestApp.Cleanup()
 }
 

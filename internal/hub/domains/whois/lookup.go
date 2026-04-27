@@ -74,16 +74,31 @@ func (s *LookupService) LookupDomain(ctx context.Context, domainName string) (*d
 
 // LookupWHOIS performs WHOIS lookup with multiple fallback methods
 func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, error) {
+	var lastErr error
+
 	// Try RDAP first (modern replacement for WHOIS)
 	data, err := s.tryRDAP(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
 		return data, nil
+	}
+	lastErr = err
+
+	// Try pure-Go TCP WHOIS (works in containers without whois binary)
+	data, err = s.tryTCPWHOIS(ctx, domainName)
+	if err == nil && data != nil && hasValidData(data) {
+		return data, nil
+	}
+	if lastErr == nil {
+		lastErr = err
 	}
 
 	// Try native whois command
 	data, err = s.tryNativeWHOIS(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
 		return data, nil
+	}
+	if lastErr == nil {
+		lastErr = err
 	}
 
 	// Try WhoisXML API if key is configured
@@ -94,7 +109,7 @@ func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*do
 		}
 	}
 
-	return nil, fmt.Errorf("all WHOIS lookup methods failed for %s", domainName)
+	return nil, fmt.Errorf("all WHOIS lookup methods failed for %s: %w", domainName, lastErr)
 }
 
 // tryRDAP attempts RDAP lookup
@@ -241,6 +256,87 @@ func (s *LookupService) tryNativeWHOIS(ctx context.Context, domainName string) (
 	}
 
 	return s.parseWHOISOutput(string(output), domainName)
+}
+
+// whoisServers maps common TLDs to their WHOIS servers
+var whoisServers = map[string]string{
+	"com":    "whois.verisign-grs.com",
+	"net":    "whois.verisign-grs.com",
+	"org":    "whois.pir.org",
+	"io":     "whois.nic.io",
+	"co":     "whois.nic.co",
+	"dev":    "whois.nic.google",
+	"app":    "whois.nic.google",
+	"xyz":    "whois.nic.xyz",
+	"info":   "whois.afilias.net",
+	"biz":    "whois.biz",
+	"us":     "whois.nic.us",
+	"uk":     "whois.nic.uk",
+	"de":     "whois.denic.de",
+	"fr":     "whois.nic.fr",
+	"eu":     "whois.eu",
+	"nl":     "whois.domain-registry.nl",
+	"ca":     "whois.cira.ca",
+	"au":     "whois.auda.org.au",
+	"me":     "whois.nic.me",
+	"tv":     "whois.nic.tv",
+	"cc":     "whois.nic.cc",
+	"ws":     "whois.website.ws",
+	"name":   "whois.nic.name",
+	"mobi":   "whois.dotmobiregistry.net",
+	"asia":   "whois.nic.asia",
+	"pro":    "whois.nic.pro",
+	"jobs":   "whois.nic.jobs",
+	"travel": "whois.nic.travel",
+}
+
+// tryTCPWHOIS performs WHOIS lookup via direct TCP connection (port 43)
+func (s *LookupService) tryTCPWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, error) {
+	parts := strings.Split(domainName, ".")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid domain format")
+	}
+	tld := strings.ToLower(parts[len(parts)-1])
+
+	server, ok := whoisServers[tld]
+	if !ok {
+		// Fallback to IANA for unknown TLDs
+		server = "whois.iana.org"
+	}
+
+	addr := net.JoinHostPort(server, "43")
+
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("tcp whois dial failed: %w", err)
+	}
+	defer conn.Close()
+
+	// Some servers require the domain followed by \r\n
+	query := domainName + "\r\n"
+	if _, err := conn.Write([]byte(query)); err != nil {
+		return nil, fmt.Errorf("tcp whois write failed: %w", err)
+	}
+
+	// Read response with deadline
+	if err := conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return nil, err
+	}
+
+	var output strings.Builder
+	buf := make([]byte, 4096)
+	for {
+		n, err := conn.Read(buf)
+		if n > 0 {
+			output.Write(buf[:n])
+		}
+		if err != nil {
+			break
+		}
+	}
+
+	return s.parseWHOISOutput(output.String(), domainName)
 }
 
 // tryWhoisXML tries the WhoisXML API
@@ -730,7 +826,20 @@ func cleanDomain(domain string) string {
 	return strings.ToLower(strings.TrimSpace(domain))
 }
 
-// hasValidData checks if WHOIS data has the minimum required fields
+// hasValidData checks if WHOIS data has useful parsed fields
 func hasValidData(data *domain.WHOISData) bool {
-	return data != nil && (data.Dates.ExpiryDate != nil || data.Registrar.Name != "")
+	if data == nil {
+		return false
+	}
+	// Accept if we got any meaningful data
+	if data.Dates.ExpiryDate != nil || data.Dates.CreationDate != nil {
+		return true
+	}
+	if data.Registrar.Name != "" && data.Registrar.Name != "Unknown" {
+		return true
+	}
+	if len(data.Status) > 0 {
+		return true
+	}
+	return false
 }

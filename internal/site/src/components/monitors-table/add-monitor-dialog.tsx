@@ -15,7 +15,9 @@ import { Label } from "@/components/ui/label"
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select"
@@ -32,15 +34,41 @@ import {
 	type UpdateMonitorRequest,
 } from "@/lib/monitors"
 
-const MONITOR_TYPES: { value: MonitorType; label: string }[] = [
-	{ value: "http", label: "HTTP" },
-	{ value: "https", label: "HTTPS" },
-	{ value: "tcp", label: "TCP Port" },
-	{ value: "ping", label: "Ping" },
-	{ value: "dns", label: "DNS" },
-	{ value: "keyword", label: "HTTP Keyword" },
-	{ value: "json-query", label: "HTTP JSON" },
-	{ value: "docker", label: "Docker Container" },
+const MONITOR_TYPES: { value: MonitorType; label: string; group: string }[] = [
+	// General
+	{ value: "http", label: "HTTP", group: "General" },
+	{ value: "https", label: "HTTPS", group: "General" },
+	{ value: "keyword", label: "HTTP Keyword", group: "General" },
+	{ value: "json-query", label: "HTTP JSON", group: "General" },
+	{ value: "grpc-keyword", label: "gRPC Keyword", group: "General" },
+	{ value: "real-browser", label: "Browser Engine (Beta)", group: "General" },
+	{ value: "tcp", label: "TCP Port", group: "General" },
+	{ value: "ping", label: "Ping", group: "General" },
+	{ value: "dns", label: "DNS", group: "General" },
+	{ value: "docker", label: "Docker Container", group: "General" },
+	{ value: "push", label: "Push", group: "General" },
+	{ value: "manual", label: "Manual", group: "General" },
+	// Network / Protocol
+	{ value: "mqtt", label: "MQTT", group: "Network / Protocol" },
+	{ value: "rabbitmq", label: "RabbitMQ", group: "Network / Protocol" },
+	{ value: "kafka-producer", label: "Kafka Producer", group: "Network / Protocol" },
+	{ value: "smtp", label: "SMTP", group: "Network / Protocol" },
+	{ value: "snmp", label: "SNMP", group: "Network / Protocol" },
+	{ value: "websocket-upgrade", label: "WebSocket Upgrade", group: "Network / Protocol" },
+	{ value: "sip-options", label: "SIP Options Ping", group: "Network / Protocol" },
+	{ value: "tailscale-ping", label: "Tailscale Ping", group: "Network / Protocol" },
+	{ value: "globalping", label: "Globalping", group: "Network / Protocol" },
+	// Database
+	{ value: "mysql", label: "MySQL / MariaDB", group: "Database" },
+	{ value: "postgresql", label: "PostgreSQL", group: "Database" },
+	{ value: "mongodb", label: "MongoDB", group: "Database" },
+	{ value: "redis", label: "Redis", group: "Database" },
+	{ value: "sqlserver", label: "Microsoft SQL Server", group: "Database" },
+	{ value: "oracledb", label: "Oracle DB", group: "Database" },
+	{ value: "radius", label: "RADIUS", group: "Database" },
+	// Games
+	{ value: "gamedig", label: "GameDig", group: "Game Server" },
+	{ value: "steam", label: "Steam API", group: "Game Server" },
 ]
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"]
@@ -88,6 +116,27 @@ export function AddMonitorDialog({
 	const [certExpiryNotification, setCertExpiryNotification] = useState(false)
 	const [certExpiryDays, setCertExpiryDays] = useState(14)
 
+	// Database / network fields
+	const [dbConnectionString, setDbConnectionString] = useState("")
+	const [dbUsername, setDbUsername] = useState("")
+	const [dbPassword, setDbPassword] = useState("")
+	const [dbName, setDbName] = useState("")
+	const [mqttTopic, setMqttTopic] = useState("")
+	const [grpcKeyword, setGrpcKeyword] = useState("")
+	
+	// Notification settings
+	const [notifyOnDown, setNotifyOnDown] = useState(true)
+	const [notifyOnRecover, setNotifyOnRecover] = useState(true)
+	const [notifyOnResponseTime, setNotifyOnResponseTime] = useState(false)
+	const [responseTimeThreshold, setResponseTimeThreshold] = useState(1000)
+	const [notifyOnUptimeDrop, setNotifyOnUptimeDrop] = useState(false)
+	const [uptimeThreshold, setUptimeThreshold] = useState(95)
+	const [notifyRepeatedFailures, setNotifyRepeatedFailures] = useState(true)
+	const [consecutiveFailures, setConsecutiveFailures] = useState(3)
+	const [quietHoursStart, setQuietHoursStart] = useState("22:00")
+	const [quietHoursEnd, setQuietHoursEnd] = useState("08:00")
+	const [quietHoursEnabled, setQuietHoursEnabled] = useState(false)
+
 	// Reset form when dialog opens/closes
 	useEffect(() => {
 		if (open) {
@@ -114,6 +163,19 @@ export function AddMonitorDialog({
 				setIgnoreTLSError(monitor.ignore_tls_error || false)
 				setCertExpiryNotification(monitor.cert_expiry_notification || false)
 				setCertExpiryDays(monitor.cert_expiry_days || 14)
+				
+				// Load notification settings
+				setNotifyOnDown(monitor.notify_on_down !== false)
+				setNotifyOnRecover(monitor.notify_on_recover !== false)
+				setNotifyOnResponseTime(monitor.notify_on_response_time || false)
+				setResponseTimeThreshold(monitor.response_time_threshold || 1000)
+				setNotifyOnUptimeDrop(monitor.notify_on_uptime_drop || false)
+				setUptimeThreshold(monitor.uptime_threshold || 95)
+				setNotifyRepeatedFailures(monitor.notify_repeated_failures !== false)
+				setConsecutiveFailures(monitor.consecutive_failures || 3)
+				setQuietHoursStart(monitor.quiet_hours_start || "22:00")
+				setQuietHoursEnd(monitor.quiet_hours_end || "08:00")
+				setQuietHoursEnabled(monitor.quiet_hours_enabled || false)
 			} else {
 				// Reset to defaults for new monitor
 				setName("")
@@ -137,6 +199,19 @@ export function AddMonitorDialog({
 				setIgnoreTLSError(false)
 				setCertExpiryNotification(false)
 				setCertExpiryDays(14)
+				
+				// Reset notification settings
+				setNotifyOnDown(true)
+				setNotifyOnRecover(true)
+				setNotifyOnResponseTime(false)
+				setResponseTimeThreshold(1000)
+				setNotifyOnUptimeDrop(false)
+				setUptimeThreshold(95)
+				setNotifyRepeatedFailures(true)
+				setConsecutiveFailures(3)
+				setQuietHoursStart("22:00")
+				setQuietHoursEnd("08:00")
+				setQuietHoursEnabled(false)
 			}
 			setActiveTab("basic")
 		}
@@ -186,8 +261,8 @@ export function AddMonitorDialog({
 		if (isEdit && monitor) {
 			const data: UpdateMonitorRequest = {
 				name: name.trim(),
-				url: url.trim() || undefined,
-				hostname: hostname.trim() || undefined,
+				url: needsDbOptions ? dbConnectionString.trim() || undefined : url.trim() || undefined,
+				hostname: needsHostname ? hostname.trim() || undefined : undefined,
 				port: port ? Number(port) : undefined,
 				method: ["http", "https", "keyword", "json-query"].includes(type)
 					? method
@@ -210,14 +285,32 @@ export function AddMonitorDialog({
 						: undefined,
 				cert_expiry_notification: type === "https" ? certExpiryNotification : undefined,
 				cert_expiry_days: type === "https" ? certExpiryDays : undefined,
+				// Notification settings
+				notify_on_down: notifyOnDown,
+				notify_on_recover: notifyOnRecover,
+				notify_on_response_time: notifyOnResponseTime,
+				response_time_threshold: notifyOnResponseTime ? responseTimeThreshold : undefined,
+				notify_on_uptime_drop: notifyOnUptimeDrop,
+				uptime_threshold: notifyOnUptimeDrop ? uptimeThreshold : undefined,
+				notify_repeated_failures: notifyRepeatedFailures,
+				consecutive_failures: consecutiveFailures,
+				quiet_hours_enabled: quietHoursEnabled,
+				quiet_hours_start: quietHoursEnabled ? quietHoursStart : undefined,
+				quiet_hours_end: quietHoursEnabled ? quietHoursEnd : undefined,
+				// Database / network extra fields
+				db_username: needsDbOptions ? dbUsername.trim() || undefined : undefined,
+				db_password: needsDbOptions ? dbPassword.trim() || undefined : undefined,
+				db_name: needsDbOptions ? dbName.trim() || undefined : undefined,
+				mqtt_topic: needsMqttOptions ? mqttTopic.trim() || undefined : undefined,
+				grpc_keyword: needsGrpcOptions ? grpcKeyword.trim() || undefined : undefined,
 			}
 			updateMutation.mutate({ id: monitor.id, data })
 		} else {
 			const data: CreateMonitorRequest = {
 				name: name.trim(),
 				type,
-				url: url.trim() || undefined,
-				hostname: hostname.trim() || undefined,
+				url: needsDbOptions ? dbConnectionString.trim() || undefined : url.trim() || undefined,
+				hostname: needsHostname ? hostname.trim() || undefined : undefined,
 				port: port ? Number(port) : undefined,
 				method: ["http", "https", "keyword", "json-query"].includes(type)
 					? method
@@ -240,19 +333,40 @@ export function AddMonitorDialog({
 						: undefined,
 				cert_expiry_notification: type === "https" ? certExpiryNotification : undefined,
 				cert_expiry_days: type === "https" ? certExpiryDays : undefined,
+				// Notification settings
+				notify_on_down: notifyOnDown,
+				notify_on_recover: notifyOnRecover,
+				notify_on_response_time: notifyOnResponseTime,
+				response_time_threshold: notifyOnResponseTime ? responseTimeThreshold : undefined,
+				notify_on_uptime_drop: notifyOnUptimeDrop,
+				uptime_threshold: notifyOnUptimeDrop ? uptimeThreshold : undefined,
+				notify_repeated_failures: notifyRepeatedFailures,
+				consecutive_failures: consecutiveFailures,
+				quiet_hours_enabled: quietHoursEnabled,
+				quiet_hours_start: quietHoursEnabled ? quietHoursStart : undefined,
+				quiet_hours_end: quietHoursEnabled ? quietHoursEnd : undefined,
+				// Database / network extra fields
+				db_username: needsDbOptions ? dbUsername.trim() || undefined : undefined,
+				db_password: needsDbOptions ? dbPassword.trim() || undefined : undefined,
+				db_name: needsDbOptions ? dbName.trim() || undefined : undefined,
+				mqtt_topic: needsMqttOptions ? mqttTopic.trim() || undefined : undefined,
+				grpc_keyword: needsGrpcOptions ? grpcKeyword.trim() || undefined : undefined,
 			}
 			createMutation.mutate(data)
 		}
 	}
 
-	const needsUrl = ["http", "https", "keyword", "json-query"].includes(type)
-	const needsHostname = ["tcp", "ping", "dns"].includes(type)
-	const needsPort = type === "tcp"
+	const needsUrl = ["http", "https", "keyword", "json-query", "grpc-keyword", "real-browser", "websocket-upgrade", "push"].includes(type)
+	const needsHostname = ["tcp", "ping", "dns", "mqtt", "rabbitmq", "kafka-producer", "smtp", "snmp", "sip-options", "tailscale-ping", "globalping", "mysql", "postgresql", "mongodb", "redis", "sqlserver", "oracledb", "radius", "gamedig", "steam"].includes(type)
+	const needsPort = ["tcp", "smtp", "mysql", "postgresql", "redis", "sqlserver", "oracledb", "radius", "mqtt", "rabbitmq", "kafka-producer", "gamedig", "steam", "snmp"].includes(type)
 	const needsHttpOptions = ["http", "https", "keyword", "json-query"].includes(type)
 	const needsKeyword = type === "keyword"
 	const needsJsonQuery = type === "json-query"
 	const needsDnsOptions = type === "dns"
 	const needsTlsOptions = type === "https"
+	const needsDbOptions = ["mysql", "postgresql", "mongodb", "redis", "sqlserver", "oracledb", "radius"].includes(type)
+	const needsMqttOptions = type === "mqtt"
+	const needsGrpcOptions = type === "grpc-keyword"
 
 	const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -296,6 +410,8 @@ export function AddMonitorDialog({
 										value={name}
 										onChange={(e) => setName(e.target.value)}
 										required
+										tabIndex={0}
+										autoFocus
 									/>
 								</div>
 
@@ -311,10 +427,15 @@ export function AddMonitorDialog({
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											{MONITOR_TYPES.map((mt) => (
-												<SelectItem key={mt.value} value={mt.value}>
-													{mt.label}
-												</SelectItem>
+											{["General", "Network / Protocol", "Database", "Game Server"].map((group) => (
+												<SelectGroup key={group}>
+													<SelectLabel>{group}</SelectLabel>
+													{MONITOR_TYPES.filter((mt) => mt.group === group).map((mt) => (
+															<SelectItem key={mt.value} value={mt.value}>
+																{mt.label}
+															</SelectItem>
+														))}
+												</SelectGroup>
 											))}
 										</SelectContent>
 									</Select>
@@ -479,6 +600,90 @@ export function AddMonitorDialog({
 									</div>
 								)}
 
+								{needsDbOptions && (
+									<div className="space-y-4 border rounded-lg p-4">
+										<h4 className="font-medium text-sm">
+											<Trans>Database Connection</Trans>
+										</h4>
+										<div className="grid gap-2">
+											<Label htmlFor="dbConnectionString">
+												<Trans>Host / Connection String</Trans> *
+											</Label>
+											<Input
+												id="dbConnectionString"
+												placeholder={t`localhost:3306`}
+												value={dbConnectionString}
+												onChange={(e) => setDbConnectionString(e.target.value)}
+												required={needsDbOptions}
+											/>
+										</div>
+										<div className="grid grid-cols-2 gap-4">
+											<div className="grid gap-2">
+												<Label htmlFor="dbUsername">
+													<Trans>Username</Trans>
+												</Label>
+												<Input
+													id="dbUsername"
+													placeholder={t`root`}
+													value={dbUsername}
+													onChange={(e) => setDbUsername(e.target.value)}
+												/>
+											</div>
+											<div className="grid gap-2">
+												<Label htmlFor="dbPassword">
+													<Trans>Password</Trans>
+												</Label>
+												<Input
+													id="dbPassword"
+													type="password"
+													placeholder={t`password`}
+													value={dbPassword}
+													onChange={(e) => setDbPassword(e.target.value)}
+												/>
+											</div>
+										</div>
+										<div className="grid gap-2">
+											<Label htmlFor="dbName">
+												<Trans>Database Name</Trans>
+											</Label>
+											<Input
+												id="dbName"
+												placeholder={t`mydb`}
+												value={dbName}
+												onChange={(e) => setDbName(e.target.value)}
+											/>
+										</div>
+									</div>
+								)}
+
+								{needsMqttOptions && (
+									<div className="grid gap-2">
+										<Label htmlFor="mqttTopic">
+											<Trans>MQTT Topic</Trans>
+										</Label>
+										<Input
+											id="mqttTopic"
+											placeholder={t`sensor/temperature`}
+											value={mqttTopic}
+											onChange={(e) => setMqttTopic(e.target.value)}
+										/>
+									</div>
+								)}
+
+								{needsGrpcOptions && (
+									<div className="grid gap-2">
+										<Label htmlFor="grpcKeyword">
+											<Trans>gRPC Keyword</Trans>
+										</Label>
+										<Input
+											id="grpcKeyword"
+											placeholder={t`health`}
+											value={grpcKeyword}
+											onChange={(e) => setGrpcKeyword(e.target.value)}
+										/>
+									</div>
+								)}
+
 								<div className="grid gap-2">
 									<Label htmlFor="description">
 										<Trans>Description</Trans>
@@ -583,54 +788,193 @@ export function AddMonitorDialog({
 						</TabsContent>
 
 						<TabsContent value="notifications" className="space-y-4 mt-4">
+							{/* Status Change Notifications */}
+							<div className="space-y-4 border rounded-lg p-4">
+								<h4 className="font-medium text-sm">Status Change Alerts</h4>
+								
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label htmlFor="notifyOnDown">Notify when monitor goes down</Label>
+										<p className="text-xs text-muted-foreground">Send alert when service becomes unavailable</p>
+									</div>
+									<Switch
+										id="notifyOnDown"
+										checked={notifyOnDown}
+										onCheckedChange={setNotifyOnDown}
+									/>
+								</div>
+
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label htmlFor="notifyOnRecover">Notify when monitor recovers</Label>
+										<p className="text-xs text-muted-foreground">Send alert when service comes back up</p>
+									</div>
+									<Switch
+										id="notifyOnRecover"
+										checked={notifyOnRecover}
+										onCheckedChange={setNotifyOnRecover}
+									/>
+								</div>
+
+								<div className="space-y-3">
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="notifyRepeatedFailures">Repeated failures only</Label>
+											<p className="text-xs text-muted-foreground">Only alert after multiple consecutive failures</p>
+										</div>
+										<Switch
+											id="notifyRepeatedFailures"
+											checked={notifyRepeatedFailures}
+											onCheckedChange={setNotifyRepeatedFailures}
+										/>
+									</div>
+									{notifyRepeatedFailures && (
+										<div className="grid gap-2 pl-4 border-l-2">
+											<Label htmlFor="consecutiveFailures">Consecutive failures before alert</Label>
+											<Input
+												id="consecutiveFailures"
+												type="number"
+												min={1}
+												max={10}
+												value={consecutiveFailures}
+												onChange={(e) => setConsecutiveFailures(Number(e.target.value))}
+												className="w-32"
+											/>
+										</div>
+									)}
+								</div>
+							</div>
+
+							{/* Performance Alerts */}
+							<div className="space-y-4 border rounded-lg p-4">
+								<h4 className="font-medium text-sm">Performance Alerts</h4>
+								
+								<div className="space-y-3">
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="notifyOnResponseTime">Response time threshold</Label>
+											<p className="text-xs text-muted-foreground">Alert when response time exceeds limit</p>
+										</div>
+										<Switch
+											id="notifyOnResponseTime"
+											checked={notifyOnResponseTime}
+											onCheckedChange={setNotifyOnResponseTime}
+										/>
+									</div>
+									{notifyOnResponseTime && (
+										<div className="grid gap-2 pl-4 border-l-2">
+											<Label htmlFor="responseTimeThreshold">Max response time (ms)</Label>
+											<Input
+												id="responseTimeThreshold"
+												type="number"
+												min={100}
+												max={60000}
+												step={100}
+												value={responseTimeThreshold}
+												onChange={(e) => setResponseTimeThreshold(Number(e.target.value))}
+												className="w-32"
+											/>
+										</div>
+									)}
+								</div>
+
+								<div className="space-y-3">
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="notifyOnUptimeDrop">Uptime threshold</Label>
+											<p className="text-xs text-muted-foreground">Alert when uptime percentage drops below</p>
+										</div>
+										<Switch
+											id="notifyOnUptimeDrop"
+											checked={notifyOnUptimeDrop}
+											onCheckedChange={setNotifyOnUptimeDrop}
+										/>
+									</div>
+									{notifyOnUptimeDrop && (
+										<div className="grid gap-2 pl-4 border-l-2">
+											<Label htmlFor="uptimeThreshold">Minimum uptime (%)</Label>
+											<Input
+												id="uptimeThreshold"
+												type="number"
+												min={1}
+												max={100}
+												value={uptimeThreshold}
+												onChange={(e) => setUptimeThreshold(Number(e.target.value))}
+												className="w-32"
+											/>
+										</div>
+									)}
+								</div>
+							</div>
+
+							{/* Certificate Expiry */}
 							{needsTlsOptions && (
 								<div className="space-y-4 border rounded-lg p-4">
-									<div className="flex items-center gap-2">
+									<h4 className="font-medium text-sm">Certificate Alerts</h4>
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="certExpiryNotification">Notify when certificate expires</Label>
+											<p className="text-xs text-muted-foreground">Alert before SSL certificate expiry</p>
+										</div>
 										<Switch
 											id="certExpiryNotification"
 											checked={certExpiryNotification}
 											onCheckedChange={setCertExpiryNotification}
 										/>
-										<Label htmlFor="certExpiryNotification">
-											<Trans>Notify when certificate expires</Trans>
-										</Label>
 									</div>
 									{certExpiryNotification && (
-										<div className="grid gap-2 mt-2">
-											<Label htmlFor="certExpiryDays">
-												<Trans>Days before expiry to notify</Trans>
-											</Label>
+										<div className="grid gap-2 pl-4 border-l-2">
+											<Label htmlFor="certExpiryDays">Days before expiry to notify</Label>
 											<Input
 												id="certExpiryDays"
 												type="number"
 												min={1}
 												max={90}
 												value={certExpiryDays}
-												onChange={(e) =>
-													setCertExpiryDays(Number(e.target.value))
-												}
+												onChange={(e) => setCertExpiryDays(Number(e.target.value))}
+												className="w-32"
 											/>
 										</div>
 									)}
 								</div>
 							)}
 
-							{!needsTlsOptions && (
-								<p className="text-muted-foreground text-sm">
-									<Trans>
-										Certificate expiry notifications are only available
-										for HTTPS monitors.
-									</Trans>
-								</p>
-							)}
-
-							<div className="border rounded-lg p-4">
-								<p className="text-sm text-muted-foreground">
-									<Trans>
-										General notification settings will be configured in
-										the Notifications tab.
-									</Trans>
-								</p>
+							{/* Quiet Hours */}
+							<div className="space-y-4 border rounded-lg p-4">
+								<h4 className="font-medium text-sm">Quiet Hours</h4>
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label htmlFor="quietHoursEnabled">Enable quiet hours</Label>
+										<p className="text-xs text-muted-foreground">Suppress notifications during specific hours</p>
+									</div>
+									<Switch
+										id="quietHoursEnabled"
+										checked={quietHoursEnabled}
+										onCheckedChange={setQuietHoursEnabled}
+									/>
+								</div>
+								{quietHoursEnabled && (
+									<div className="grid grid-cols-2 gap-4 pl-4 border-l-2">
+										<div className="grid gap-2">
+											<Label htmlFor="quietHoursStart">Start time</Label>
+											<Input
+												id="quietHoursStart"
+												type="time"
+												value={quietHoursStart}
+												onChange={(e) => setQuietHoursStart(e.target.value)}
+											/>
+										</div>
+										<div className="grid gap-2">
+											<Label htmlFor="quietHoursEnd">End time</Label>
+											<Input
+												id="quietHoursEnd"
+												type="time"
+												value={quietHoursEnd}
+												onChange={(e) => setQuietHoursEnd(e.target.value)}
+											/>
+										</div>
+									</div>
+								)}
 							</div>
 						</TabsContent>
 					</Tabs>

@@ -34,6 +34,10 @@ const Smart = lazy(() => import("@/components/routes/smart.tsx"))
 const SystemDetail = lazy(() => import("@/components/routes/system.tsx"))
 const DomainDetail = lazy(() => import("@/components/routes/domain.tsx"))
 const MonitorDetail = lazy(() => import("@/components/routes/monitor.tsx"))
+const StatusPages = lazy(() => import("@/components/routes/status-pages.tsx"))
+const Incidents = lazy(() => import("@/components/routes/incidents.tsx"))
+const Calendar = lazy(() => import("@/components/routes/calendar.tsx"))
+const Monitoring = lazy(() => import("@/components/routes/monitoring.tsx"))
 const CopyToClipboardDialog = lazy(() => import("@/components/copy-to-clipboard.tsx"))
 
 const App = memo(() => {
@@ -88,6 +92,14 @@ const App = memo(() => {
 		return <Smart />
 	} else if (page.route === "settings") {
 		return <Settings />
+	} else if (page.route === "status_pages") {
+		return <StatusPages />
+	} else if (page.route === "incidents") {
+		return <Incidents />
+	} else if (page.route === "calendar") {
+		return <Calendar />
+	} else if (page.route === "monitoring") {
+		return <Monitoring />
 	}
 })
 

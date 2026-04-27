@@ -3,6 +3,8 @@
 package hub
 
 import (
+	"github.com/henrygd/beszel/internal/hub/domains"
+	"github.com/henrygd/beszel/internal/hub/monitors"
 	"github.com/henrygd/beszel/internal/hub/systems"
 )
 
@@ -23,4 +25,14 @@ func (h *Hub) SetPubkey(pubkey string) {
 
 func (h *Hub) SetCollectionAuthSettings() error {
 	return setCollectionAuthSettings(h)
+}
+
+// TESTING ONLY: GetDomainScheduler returns the domain scheduler
+func (h *Hub) GetDomainScheduler() *domains.Scheduler {
+	return h.domainSched
+}
+
+// TESTING ONLY: GetMonitorScheduler returns the monitor scheduler
+func (h *Hub) GetMonitorScheduler() *monitors.Scheduler {
+	return h.monSched
 }

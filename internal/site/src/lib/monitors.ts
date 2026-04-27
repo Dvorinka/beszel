@@ -1,6 +1,37 @@
 import { pb } from "./api.ts"
 
-export type MonitorType = "http" | "https" | "tcp" | "ping" | "dns" | "keyword" | "json-query" | "docker"
+export type MonitorType =
+	| "http"
+	| "https"
+	| "tcp"
+	| "ping"
+	| "dns"
+	| "keyword"
+	| "json-query"
+	| "docker"
+	| "push"
+	| "manual"
+	| "system-service"
+	| "real-browser"
+	| "grpc-keyword"
+	| "mqtt"
+	| "rabbitmq"
+	| "kafka-producer"
+	| "smtp"
+	| "snmp"
+	| "sip-options"
+	| "tailscale-ping"
+	| "websocket-upgrade"
+	| "globalping"
+	| "mysql"
+	| "mongodb"
+	| "redis"
+	| "postgresql"
+	| "sqlserver"
+	| "oracledb"
+	| "radius"
+	| "gamedig"
+	| "steam"
 
 export type MonitorStatus = "up" | "down" | "pending" | "paused" | "maintenance"
 
@@ -30,6 +61,19 @@ export interface Monitor {
 	cert_expiry_notification?: boolean
 	cert_expiry_days?: number
 	ignore_tls_error?: boolean
+	// Notification settings
+	notify_on_down?: boolean
+	notify_on_recover?: boolean
+	notify_on_response_time?: boolean
+	response_time_threshold?: number
+	notify_on_uptime_drop?: boolean
+	uptime_threshold?: number
+	notify_repeated_failures?: boolean
+	consecutive_failures?: number
+	quiet_hours_enabled?: boolean
+	quiet_hours_start?: string
+	quiet_hours_end?: string
+	status_pages?: string[]
 	created: string
 	updated: string
 }
@@ -79,6 +123,24 @@ export interface CreateMonitorRequest {
 	cert_expiry_notification?: boolean
 	cert_expiry_days?: number
 	ignore_tls_error?: boolean
+	// Notification settings
+	notify_on_down?: boolean
+	notify_on_recover?: boolean
+	notify_on_response_time?: boolean
+	response_time_threshold?: number
+	notify_on_uptime_drop?: boolean
+	uptime_threshold?: number
+	notify_repeated_failures?: boolean
+	consecutive_failures?: number
+	quiet_hours_enabled?: boolean
+	quiet_hours_start?: string
+	quiet_hours_end?: string
+	// Database / network extra fields
+	db_username?: string
+	db_password?: string
+	db_name?: string
+	mqtt_topic?: string
+	grpc_keyword?: string
 }
 
 export interface UpdateMonitorRequest {
@@ -106,6 +168,24 @@ export interface UpdateMonitorRequest {
 	cert_expiry_notification?: boolean
 	cert_expiry_days?: number
 	ignore_tls_error?: boolean
+	// Notification settings
+	notify_on_down?: boolean
+	notify_on_recover?: boolean
+	notify_on_response_time?: boolean
+	response_time_threshold?: number
+	notify_on_uptime_drop?: boolean
+	uptime_threshold?: number
+	notify_repeated_failures?: boolean
+	consecutive_failures?: number
+	quiet_hours_enabled?: boolean
+	quiet_hours_start?: string
+	quiet_hours_end?: string
+	// Database / network extra fields
+	db_username?: string
+	db_password?: string
+	db_name?: string
+	mqtt_topic?: string
+	grpc_keyword?: string
 }
 
 export interface CheckResult {
@@ -185,6 +265,29 @@ export function getMonitorTypeLabel(type: MonitorType): string {
 		keyword: "HTTP Keyword",
 		"json-query": "HTTP JSON",
 		docker: "Docker Container",
+		push: "Push",
+		manual: "Manual",
+		"system-service": "System Service",
+		"real-browser": "Browser Engine (Beta)",
+		"grpc-keyword": "gRPC Keyword",
+		mqtt: "MQTT",
+		rabbitmq: "RabbitMQ",
+		"kafka-producer": "Kafka Producer",
+		smtp: "SMTP",
+		snmp: "SNMP",
+		"sip-options": "SIP Options Ping",
+		"tailscale-ping": "Tailscale Ping",
+		"websocket-upgrade": "WebSocket Upgrade",
+		globalping: "Globalping",
+		mysql: "MySQL / MariaDB",
+		mongodb: "MongoDB",
+		redis: "Redis",
+		postgresql: "PostgreSQL",
+		sqlserver: "Microsoft SQL Server",
+		oracledb: "Oracle DB",
+		radius: "RADIUS",
+		gamedig: "GameDig",
+		steam: "Steam API",
 	}
 	return labels[type] || type
 }

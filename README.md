@@ -1,101 +1,168 @@
-# Beszel (Domain-Enhanced Fork)
+# Beszel - Unified Monitoring Platform
 
-> **A fork of [Beszel](https://github.com/henrygd/beszel)** with added domain and SSL certificate monitoring capabilities.
+> Lightweight server monitoring, website monitoring, and domain expiry tracking in a single dashboard.
 
-Beszel is a lightweight server monitoring platform that includes Docker statistics, historical data, and alert functions. **This fork extends Beszel with domain and SSL certificate monitoring**, combining the best of server metrics with domain expiration tracking in a single dashboard.
+Beszel is a unified monitoring platform that combines system metrics, service uptime monitoring, and domain/SSL expiry tracking. Built on [PocketBase](https://pocketbase.io/) with a modern React frontend, it is designed to be lightweight, self-hosted, and production-ready.
 
-It has a friendly web interface, simple configuration, and is ready to use out of the box. It supports automatic backup, multi-user, OAuth authentication, and API access.
+## Quick Start
 
-[![agent Docker Image Size](https://img.shields.io/docker/image-size/henrygd/beszel-agent/latest?logo=docker&label=agent%20image%20size)](https://hub.docker.com/r/henrygd/beszel-agent)
-[![hub Docker Image Size](https://img.shields.io/docker/image-size/henrygd/beszel/latest?logo=docker&label=hub%20image%20size)](https://hub.docker.com/r/henrygd/beszel)
-[![MIT license](https://img.shields.io/github/license/henrygd/beszel?color=%239944ee)](https://github.com/henrygd/beszel/blob/main/LICENSE)
-[![Crowdin](https://badges.crowdin.net/beszel/localized.svg)](https://crowdin.com/project/beszel)
+### Docker Compose
 
-![Screenshot of Beszel dashboard and system page, side by side. The dashboard shows metrics from multiple connected systems, while the system page shows detailed metrics for a single system.](https://henrygd-assets.b-cdn.net/beszel/screenshot-new.png)
+```bash
+# Clone the repository
+git clone https://github.com/henrygd/beszel.git
+cd beszel
+
+# Copy and edit environment variables (optional)
+cp .env.example .env
+
+# Start the hub
+make start
+# or: docker compose up -d
+
+# View logs
+make logs
+
+# Stop everything
+make stop
+```
+
+The hub will be available at `http://localhost:8090`. Create your admin account on first visit.
+
+Agents run on separate hosts and connect to the hub. See [Adding Agents](#adding-agents) below.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_URL` | `http://localhost:8090` | Public URL for links |
+| `INSTANCE_NAME` | `Beszel Monitoring` | Instance display name |
+| `REGISTRATION_ENABLED` | `true` | Allow new user registration |
+| `MAX_MONITORS_PER_USER` | `50` | Monitor limit per user |
+| `MAX_DOMAINS_PER_USER` | `50` | Domain limit per user |
+| `MAX_STATUS_PAGES` | `10` | Status page limit |
+| `TWO_FACTOR_ENABLED` | `true` | Enable 2FA |
+| `PASSKEY_ENABLED` | `true` | Enable passkey auth |
+| `STATUS_PAGES_ENABLED` | `true` | Enable public status pages |
+| `BADGES_ENABLED` | `true` | Enable SVG badge generation |
+| `PAGESPEED_ENABLED` | `true` | Enable PageSpeed checks |
+| `SUBDOMAIN_DISCOVERY` | `true` | Auto-discover subdomains |
 
 ## Features
 
-### Server Monitoring (from Beszel)
-- **Lightweight**: Smaller and less resource-intensive than leading solutions.
-- **Simple**: Easy setup with little manual configuration required.
-- **Docker stats**: Tracks CPU, memory, and network usage history for each container.
-- **System metrics**: CPU, memory, disk usage, disk I/O, network, load average, temperature, GPU usage, battery status.
-- **S.M.A.R.T. monitoring**: Disk health tracking including eMMC wear/EOL and Linux mdraid array health.
-- **Alerts**: Configurable alerts for CPU, memory, disk, bandwidth, temperature, load average, and status.
+### System Monitoring
+- CPU, memory, disk, network metrics with historical charts
+- Docker / Podman container stats
+- GPU monitoring (Nvidia, AMD, Intel)
+- Temperature sensors and battery status
+- S.M.A.R.T. disk health tracking
 
-### Domain & SSL Monitoring (added)
-- **Domain expiration tracking**: Monitor domain expiration dates across multiple registrars.
-- **SSL certificate monitoring**: Track SSL certificate validity and expiration dates.
-- **Expiration alerts**: Get notified before domains or certificates expire.
-- **Registrar integration**: Support for multiple domain registrars.
+### Website & Service Monitoring
+- HTTP/HTTPS, TCP, Ping, DNS checks
+- Keyword and JSON query validation
+- Response time tracking with Recharts visualizations
+- Uptime statistics (24h / 7d / 30d)
+- Maintenance windows with alert suppression
 
-### Platform Features
-- **Multi-user**: Users manage their own systems. Admins can share systems across users.
-- **OAuth / OIDC**: Supports many OAuth2 providers. Password auth can be disabled.
-- **Automatic backups**: Save to and restore from disk or S3-compatible storage.
-<!-- - **REST API**: Use or update your data in your own scripts and applications. -->
+### Domain Monitoring
+- WHOIS lookup with RDAP + TCP fallback (works in scratch containers)
+- SSL certificate expiry tracking
+- DNS records (NS, MX, TXT)
+- Subdomain auto-discovery (50 common subdomains)
+- Registrar, host geolocation, and IP info
+- Bulk CSV import / JSON export
+
+### Platform
+- Multi-user with role-based access
+- OAuth 2.0 / OIDC support
+- Public status pages with custom CSS
+- Incident management with acknowledge/resolve workflow
+- Calendar view for expiry dates and incidents
+- Prometheus metrics export (`/metrics`)
+- SVG status badges for embedding
+- Browser push notifications + PWA support
+- PageSpeed Insights / Lighthouse integration
+- Automatic backups to disk or S3
 
 ## Architecture
 
-Beszel consists of two main components: the **hub** and the **agent**. This fork adds a **domain monitor** component.
+```
+Hub (Go + PocketBase + React)
+- Web UI (port 8090)
+- REST API + WebSocket
+- SQLite database with migrations
+- Scheduled jobs (domain checks, heartbeat cleanup)
 
-- **Hub**: A web application built on [PocketBase](https://pocketbase.io/) that provides a dashboard for viewing and managing connected systems and domains.
-- **Agent**: Runs on each system you want to monitor and communicates system metrics to the hub.
-- **Domain Monitor**: Tracks domain and SSL certificate expiration data from configured registrars.
+Agent (Go)
+- Runs on monitored hosts
+- Collects system + Docker metrics
+- Connects to hub via SSH tunnel
+```
 
-## Getting started
+## Adding Agents
 
-The [quick start guide](https://beszel.dev/guide/getting-started) and other documentation is available on the original Beszel website, [beszel.dev](https://beszel.dev). You'll be up and running in a few minutes.
+Agents run on the hosts you want to monitor and connect back to the hub via SSH.
 
-### Domain Monitoring Setup
+### On a remote host
 
-1. Go to Settings > Domain Monitor in the dashboard
-2. Add your domain registrar API credentials
-3. Configure domains to monitor
-4. Set alert thresholds for expiration warnings
+```bash
+# Build the agent binary
+make build-agent
 
-## Screenshots
+# Copy the binary to the remote host
+# Set KEY to the public key from the hub UI (Settings > Add System)
+KEY="ssh-ed25519 ..." ./beszel-agent
+```
 
-![Dashboard](https://beszel.dev/image/dashboard.png)
-![System page](https://beszel.dev/image/system-full.png)
-![Notification Settings](https://beszel.dev/image/settings-notifications.png)
+### With Docker on a remote host
 
-## Supported metrics
+```bash
+# Build the agent image
+make docker-agent
 
-- **CPU usage** - Host system and Docker / Podman containers.
-- **Memory usage** - Host system and containers. Includes swap and ZFS ARC.
-- **Disk usage** - Host system. Supports multiple partitions and devices.
-- **Disk I/O** - Host system. Supports multiple partitions and devices.
-- **Network usage** - Host system and containers.
-- **Load average** - Host system.
-- **Temperature** - Host system sensors.
-- **GPU usage / power draw** - Nvidia, AMD, and Intel.
-- **Battery** - Host system battery charge.
-- **Containers** - Status and metrics of all running Docker / Podman containers.
-- **S.M.A.R.T.** - Host system disk health (includes eMMC wear/EOL and Linux mdraid array health via sysfs when available).
-- **Domain expiration** - Track domain expiration dates from configured registrars.
-- **SSL certificate** - Monitor SSL certificate validity and expiration dates.
+# Run the agent container
+docker run -d \
+  --name beszel-agent \
+  --pid host \
+  -e KEY="ssh-ed25519 ..." \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -p 45876:45876 \
+  beszel-agent:latest
+```
 
-## Help and discussion
+## Building
 
-For Beszel-specific issues and discussions, please refer to the original project:
+```bash
+# Build hub + agent binaries
+make build
 
-#### Bug reports and feature requests
+# Build with Docker
+make docker-hub
+make docker-agent
 
-Bug reports for the original Beszel can be posted on [GitHub issues](https://github.com/henrygd/beszel/issues).
+# Development mode
+make dev
+```
 
-#### Support and general discussion
+## API
 
-Support requests and general discussion can be posted on [GitHub discussions](https://github.com/henrygd/beszel/discussions) or the community-run [Matrix room](https://matrix.to/#/#beszel:matrix.org): `#beszel:matrix.org`.
+Protected endpoints require Bearer token authentication.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/beszel/monitors` | List monitors |
+| `GET /api/beszel/domains` | List domains |
+| `GET /api/beszel/status-pages` | List status pages |
+| `GET /api/beszel/incidents` | List incidents |
+| `GET /api/beszel/maintenance` | List maintenance windows |
+| `GET /metrics` | Prometheus metrics (public) |
+| `GET /status/:slug` | Public status page |
+| `GET /badge/:type/:id.svg` | Status badge (public) |
 
 ## Credits
 
-This fork is built upon:
-
-- **[Beszel](https://github.com/henrygd/beszel)** - Original lightweight server monitoring platform by [henrygd](https://github.com/henrygd)
-- **[Domain Locker](https://github.com/Domain-Lockers/domain-locker)** - Domain and SSL monitoring integration
-- **[Uptime Kuma](https://github.com/louislam/uptime-kuma)** - Self-hosted monitoring tool that inspired monitoring approaches
+Based on **[Beszel](https://github.com/henrygd/beszel)** by [henrygd](https://github.com/henrygd).
 
 ## License
 
-Beszel is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+MIT License. See [LICENSE](LICENSE).

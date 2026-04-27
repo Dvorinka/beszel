@@ -1,0 +1,48 @@
+# Beszel Monitoring Hub
+# Usage:
+#   docker compose up -d              # Start hub
+#   make start                        # Quick start via Makefile
+#
+# The agent runs on remote hosts and connects to this hub.
+
+name: beszel
+
+services:
+  beszel-hub:
+    build:
+      context: .
+      target: hub
+    container_name: beszel-hub
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - beszel-data:/beszel_data
+    environment:
+      - APP_URL=${APP_URL:-http://localhost:8090}
+      - INSTANCE_NAME=${INSTANCE_NAME:-Beszel Monitoring}
+      - REGISTRATION_ENABLED=${REGISTRATION_ENABLED:-true}
+      - MAX_MONITORS_PER_USER=${MAX_MONITORS_PER_USER:-50}
+      - MAX_DOMAINS_PER_USER=${MAX_DOMAINS_PER_USER:-50}
+      - MAX_STATUS_PAGES=${MAX_STATUS_PAGES:-10}
+      - TWO_FACTOR_ENABLED=${TWO_FACTOR_ENABLED:-true}
+      - PASSKEY_ENABLED=${PASSKEY_ENABLED:-true}
+      - PAGESPEED_ENABLED=${PAGESPEED_ENABLED:-true}
+      - SUBDOMAIN_DISCOVERY=${SUBDOMAIN_DISCOVERY:-true}
+      - STATUS_PAGES_ENABLED=${STATUS_PAGES_ENABLED:-true}
+      - BADGES_ENABLED=${BADGES_ENABLED:-true}
+    healthcheck:
+      test: ["CMD", "/beszel", "health", "--url", "http://localhost:8090"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - beszel
+
+volumes:
+  beszel-data:
+
+networks:
+  beszel:
+    driver: bridge

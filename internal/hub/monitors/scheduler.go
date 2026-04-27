@@ -13,16 +13,20 @@ import (
 	"github.com/pocketbase/pocketbase/tools/store"
 )
 
+// AlertCallback is a function that sends alerts
+type AlertCallback func(userID, title, message, link, linkText string)
+
 // Scheduler manages the periodic execution of monitor checks
 type Scheduler struct {
-	app      core.App
-	registry *checks.CheckerRegistry
-	monitors *store.Store[string, *ScheduledMonitor]
-	ticker   *time.Ticker
-	stopChan chan struct{}
-	wg       sync.WaitGroup
-	mu       sync.RWMutex
-	running  bool
+	app           core.App
+	registry      *checks.CheckerRegistry
+	monitors      *store.Store[string, *ScheduledMonitor]
+	ticker        *time.Ticker
+	stopChan      chan struct{}
+	wg            sync.WaitGroup
+	mu            sync.RWMutex
+	running       bool
+	alertCallback AlertCallback
 }
 
 // ScheduledMonitor wraps a monitor with scheduling info
@@ -42,13 +46,18 @@ func NewScheduler(app core.App) *Scheduler {
 	}
 }
 
+// SetAlertCallback sets the callback function for sending alerts
+func (s *Scheduler) SetAlertCallback(callback AlertCallback) {
+	s.alertCallback = callback
+}
+
 // Start begins the scheduler loop
 func (s *Scheduler) Start() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.running {
-		return fmt.Errorf("scheduler already running")
+		return nil
 	}
 
 	// Load active monitors from database
@@ -183,7 +192,7 @@ func (s *Scheduler) runCheck(m *monitor.Monitor) {
 	}
 }
 
-// saveResult saves the check result to the database
+// saveResult saves the check result to the database and sends notifications on status change
 func (s *Scheduler) saveResult(m *monitor.Monitor, result *monitor.CheckResult) error {
 	// Update monitor record
 	record, err := s.app.FindRecordById("monitors", m.ID)
@@ -191,9 +200,18 @@ func (s *Scheduler) saveResult(m *monitor.Monitor, result *monitor.CheckResult) 
 		return fmt.Errorf("failed to find monitor: %w", err)
 	}
 
+	// Get previous status for change detection
+	prevStatus := monitor.Status(record.GetString("status"))
+	newStatus := result.Status
+
 	// Update status
-	record.Set("status", string(result.Status))
+	record.Set("status", string(newStatus))
 	record.Set("last_check", time.Now())
+
+	// Track status changes and send notifications
+	if prevStatus != newStatus {
+		s.handleStatusChange(m, record, prevStatus, newStatus, result)
+	}
 
 	// Calculate uptime stats (simplified - in production would aggregate from heartbeats)
 	if m.UptimeStats == nil {
@@ -239,6 +257,69 @@ func (s *Scheduler) saveResult(m *monitor.Monitor, result *monitor.CheckResult) 
 	}
 
 	return nil
+}
+
+// handleStatusChange sends notifications when monitor status changes
+func (s *Scheduler) handleStatusChange(m *monitor.Monitor, record *core.Record, prevStatus, newStatus monitor.Status, result *monitor.CheckResult) {
+	userID := record.GetString("user")
+	if userID == "" {
+		return
+	}
+
+	var title, message string
+	isRecovery := false
+
+	switch {
+	case prevStatus == monitor.StatusUp && newStatus == monitor.StatusDown:
+		title = fmt.Sprintf("Monitor Down: %s", m.Name)
+		message = fmt.Sprintf("The monitor %s (%s) is now DOWN.\n\nError: %s", m.Name, m.URL, result.Msg)
+	case prevStatus == monitor.StatusDown && newStatus == monitor.StatusUp:
+		title = fmt.Sprintf("Monitor Recovered: %s", m.Name)
+		message = fmt.Sprintf("The monitor %s (%s) is now UP.\n\nResponse time: %dms", m.Name, m.URL, result.Ping)
+		isRecovery = true
+	case newStatus == monitor.StatusDown:
+		// Still down after retry
+		title = fmt.Sprintf("Monitor Still Down: %s", m.Name)
+		message = fmt.Sprintf("The monitor %s (%s) remains DOWN.\n\nError: %s", m.Name, m.URL, result.Msg)
+	default:
+		// Other status changes, don't notify
+		return
+	}
+
+	// Create incident record for status change
+	s.createIncident(m, prevStatus, newStatus, result, isRecovery)
+
+	// Send notification via AlertManager if available
+	if s.alertCallback != nil {
+		link := fmt.Sprintf("/monitor/%s", m.ID)
+		linkText := "View Monitor"
+		s.alertCallback(userID, title, message, link, linkText)
+	}
+
+	log.Printf("[monitor-scheduler] Status change: %s -> %s for %s", prevStatus, newStatus, m.Name)
+}
+
+// createIncident creates an incident record for the status change
+func (s *Scheduler) createIncident(m *monitor.Monitor, prevStatus, newStatus monitor.Status, result *monitor.CheckResult, isRecovery bool) {
+	incidentCollection, err := s.app.FindCollectionByNameOrId("monitor_incidents")
+	if err != nil {
+		// Collection might not exist, just log
+		log.Printf("[monitor-scheduler] Could not create incident: %v", err)
+		return
+	}
+
+	incident := core.NewRecord(incidentCollection)
+	incident.Set("monitor", m.ID)
+	incident.Set("prev_status", string(prevStatus))
+	incident.Set("new_status", string(newStatus))
+	incident.Set("message", result.Msg)
+	incident.Set("ping", result.Ping)
+	incident.Set("is_recovery", isRecovery)
+	incident.Set("time", time.Now())
+
+	if err := s.app.Save(incident); err != nil {
+		log.Printf("[monitor-scheduler] Failed to save incident: %v", err)
+	}
 }
 
 // loadMonitors loads active monitors from the database

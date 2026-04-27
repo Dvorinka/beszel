@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import {
 	Dialog,
@@ -508,12 +508,251 @@ function EmailForm({
 	)
 }
 
-// Similar components for other providers... (abbreviated for brevity)
-// Webhook, Discord, Slack, Telegram, Gotify, Pushover forms
+// Stub form components for other notification providers
+
+const webhookSchema = z.object({
+	name: z.string().min(1, "Name is required"),
+	is_default: z.boolean(),
+	settings: z.object({
+		url: z.string().min(1, "Webhook URL is required"),
+	}),
+})
+
+type WebhookFormData = z.infer<typeof webhookSchema>
+
+function WebhookForm({ defaultValues, onSubmit, isPending, onCancel, onTest, testPending }: FormComponentProps<WebhookFormData>) {
+	const form = useForm<WebhookFormData>({ resolver: zodResolver(webhookSchema), defaultValues })
+	return (
+		<Form {...form}>
+			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+				<FormField control={form.control} name="name" render={({ field }) => (
+					<FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="My Webhook" {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<FormField control={form.control} name="settings.url" render={({ field }) => (
+					<FormItem><FormLabel>Webhook URL</FormLabel><FormControl><Input placeholder="https://hooks.example.com/..." {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<FormField control={form.control} name="is_default" render={({ field }) => (
+					<FormItem className="flex items-center justify-between rounded-lg border p-3">
+						<div className="space-y-0.5"><FormLabel>Default Provider</FormLabel></div>
+						<FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+					</FormItem>
+				)} />
+				<DialogFooter className="gap-2">
+					{onTest && <Button type="button" variant="outline" onClick={onTest} disabled={testPending}>{testPending ? "Sending..." : "Test"}</Button>}
+					<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+					<Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save"}</Button>
+				</DialogFooter>
+			</form>
+		</Form>
+	)
+}
+
+const discordSchema = z.object({
+	name: z.string().min(1, "Name is required"),
+	is_default: z.boolean(),
+	settings: z.object({
+		webhook_url: z.string().min(1, "Discord Webhook URL is required"),
+	}),
+})
+
+type DiscordFormData = z.infer<typeof discordSchema>
+
+function DiscordForm({ defaultValues, onSubmit, isPending, onCancel, onTest, testPending }: FormComponentProps<DiscordFormData>) {
+	const form = useForm<DiscordFormData>({ resolver: zodResolver(discordSchema), defaultValues })
+	return (
+		<Form {...form}>
+			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+				<FormField control={form.control} name="name" render={({ field }) => (
+					<FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="Discord Alerts" {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<FormField control={form.control} name="settings.webhook_url" render={({ field }) => (
+					<FormItem><FormLabel>Discord Webhook URL</FormLabel><FormControl><Input placeholder="https://discord.com/api/webhooks/..." {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<FormField control={form.control} name="is_default" render={({ field }) => (
+					<FormItem className="flex items-center justify-between rounded-lg border p-3">
+						<div className="space-y-0.5"><FormLabel>Default Provider</FormLabel></div>
+						<FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+					</FormItem>
+				)} />
+				<DialogFooter className="gap-2">
+					{onTest && <Button type="button" variant="outline" onClick={onTest} disabled={testPending}>{testPending ? "Sending..." : "Test"}</Button>}
+					<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+					<Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save"}</Button>
+				</DialogFooter>
+			</form>
+		</Form>
+	)
+}
+
+const slackSchema = z.object({
+	name: z.string().min(1, "Name is required"),
+	is_default: z.boolean(),
+	settings: z.object({
+		webhook_url: z.string().min(1, "Slack Webhook URL is required"),
+	}),
+})
+
+type SlackFormData = z.infer<typeof slackSchema>
+
+function SlackForm({ defaultValues, onSubmit, isPending, onCancel, onTest, testPending }: FormComponentProps<SlackFormData>) {
+	const form = useForm<SlackFormData>({ resolver: zodResolver(slackSchema), defaultValues })
+	return (
+		<Form {...form}>
+			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+				<FormField control={form.control} name="name" render={({ field }) => (
+					<FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="Slack Alerts" {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<FormField control={form.control} name="settings.webhook_url" render={({ field }) => (
+					<FormItem><FormLabel>Slack Webhook URL</FormLabel><FormControl><Input placeholder="https://hooks.slack.com/services/..." {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<FormField control={form.control} name="is_default" render={({ field }) => (
+					<FormItem className="flex items-center justify-between rounded-lg border p-3">
+						<div className="space-y-0.5"><FormLabel>Default Provider</FormLabel></div>
+						<FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+					</FormItem>
+				)} />
+				<DialogFooter className="gap-2">
+					{onTest && <Button type="button" variant="outline" onClick={onTest} disabled={testPending}>{testPending ? "Sending..." : "Test"}</Button>}
+					<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+					<Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save"}</Button>
+				</DialogFooter>
+			</form>
+		</Form>
+	)
+}
+
+const telegramSchema = z.object({
+	name: z.string().min(1, "Name is required"),
+	is_default: z.boolean(),
+	settings: z.object({
+		bot_token: z.string().min(1, "Bot Token is required"),
+		chat_id: z.string().min(1, "Chat ID is required"),
+	}),
+})
+
+type TelegramFormData = z.infer<typeof telegramSchema>
+
+function TelegramForm({ defaultValues, onSubmit, isPending, onCancel, onTest, testPending }: FormComponentProps<TelegramFormData>) {
+	const form = useForm<TelegramFormData>({ resolver: zodResolver(telegramSchema), defaultValues })
+	return (
+		<Form {...form}>
+			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+				<FormField control={form.control} name="name" render={({ field }) => (
+					<FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="Telegram Alerts" {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<div className="grid grid-cols-2 gap-4">
+					<FormField control={form.control} name="settings.bot_token" render={({ field }) => (
+						<FormItem><FormLabel>Bot Token</FormLabel><FormControl><Input placeholder="123456:ABC-DEF..." {...field} /></FormControl><FormMessage /></FormItem>
+					)} />
+					<FormField control={form.control} name="settings.chat_id" render={({ field }) => (
+						<FormItem><FormLabel>Chat ID</FormLabel><FormControl><Input placeholder="-100123456789" {...field} /></FormControl><FormMessage /></FormItem>
+					)} />
+				</div>
+				<FormField control={form.control} name="is_default" render={({ field }) => (
+					<FormItem className="flex items-center justify-between rounded-lg border p-3">
+						<div className="space-y-0.5"><FormLabel>Default Provider</FormLabel></div>
+						<FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+					</FormItem>
+				)} />
+				<DialogFooter className="gap-2">
+					{onTest && <Button type="button" variant="outline" onClick={onTest} disabled={testPending}>{testPending ? "Sending..." : "Test"}</Button>}
+					<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+					<Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save"}</Button>
+				</DialogFooter>
+			</form>
+		</Form>
+	)
+}
+
+const gotifySchema = z.object({
+	name: z.string().min(1, "Name is required"),
+	is_default: z.boolean(),
+	settings: z.object({
+		server_url: z.string().min(1, "Server URL is required"),
+		app_token: z.string().min(1, "App Token is required"),
+	}),
+})
+
+type GotifyFormData = z.infer<typeof gotifySchema>
+
+function GotifyForm({ defaultValues, onSubmit, isPending, onCancel, onTest, testPending }: FormComponentProps<GotifyFormData>) {
+	const form = useForm<GotifyFormData>({ resolver: zodResolver(gotifySchema), defaultValues })
+	return (
+		<Form {...form}>
+			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+				<FormField control={form.control} name="name" render={({ field }) => (
+					<FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="Gotify Alerts" {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<div className="grid grid-cols-2 gap-4">
+					<FormField control={form.control} name="settings.server_url" render={({ field }) => (
+						<FormItem><FormLabel>Server URL</FormLabel><FormControl><Input placeholder="https://gotify.example.com" {...field} /></FormControl><FormMessage /></FormItem>
+					)} />
+					<FormField control={form.control} name="settings.app_token" render={({ field }) => (
+						<FormItem><FormLabel>App Token</FormLabel><FormControl><Input placeholder="Abc..." {...field} /></FormControl><FormMessage /></FormItem>
+					)} />
+				</div>
+				<FormField control={form.control} name="is_default" render={({ field }) => (
+					<FormItem className="flex items-center justify-between rounded-lg border p-3">
+						<div className="space-y-0.5"><FormLabel>Default Provider</FormLabel></div>
+						<FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+					</FormItem>
+				)} />
+				<DialogFooter className="gap-2">
+					{onTest && <Button type="button" variant="outline" onClick={onTest} disabled={testPending}>{testPending ? "Sending..." : "Test"}</Button>}
+					<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+					<Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save"}</Button>
+				</DialogFooter>
+			</form>
+		</Form>
+	)
+}
+
+const pushoverSchema = z.object({
+	name: z.string().min(1, "Name is required"),
+	is_default: z.boolean(),
+	settings: z.object({
+		user_key: z.string().min(1, "User Key is required"),
+		app_token: z.string().min(1, "App Token is required"),
+	}),
+})
+
+type PushoverFormData = z.infer<typeof pushoverSchema>
+
+function PushoverForm({ defaultValues, onSubmit, isPending, onCancel, onTest, testPending }: FormComponentProps<PushoverFormData>) {
+	const form = useForm<PushoverFormData>({ resolver: zodResolver(pushoverSchema), defaultValues })
+	return (
+		<Form {...form}>
+			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+				<FormField control={form.control} name="name" render={({ field }) => (
+					<FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="Pushover Alerts" {...field} /></FormControl><FormMessage /></FormItem>
+				)} />
+				<div className="grid grid-cols-2 gap-4">
+					<FormField control={form.control} name="settings.user_key" render={({ field }) => (
+						<FormItem><FormLabel>User Key</FormLabel><FormControl><Input placeholder="u..." {...field} /></FormControl><FormMessage /></FormItem>
+					)} />
+					<FormField control={form.control} name="settings.app_token" render={({ field }) => (
+						<FormItem><FormLabel>App Token</FormLabel><FormControl><Input placeholder="a..." {...field} /></FormControl><FormMessage /></FormItem>
+					)} />
+				</div>
+				<FormField control={form.control} name="is_default" render={({ field }) => (
+					<FormItem className="flex items-center justify-between rounded-lg border p-3">
+						<div className="space-y-0.5"><FormLabel>Default Provider</FormLabel></div>
+						<FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+					</FormItem>
+				)} />
+				<DialogFooter className="gap-2">
+					{onTest && <Button type="button" variant="outline" onClick={onTest} disabled={testPending}>{testPending ? "Sending..." : "Test"}</Button>}
+					<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+					<Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save"}</Button>
+				</DialogFooter>
+			</form>
+		</Form>
+	)
+}
 
 type FormComponentProps<T> = {
 	defaultValues: T
-	onSubmit: (data: T) => void
+	onSubmit: (data: any) => void
 	isPending: boolean
 	onCancel: () => void
 	onTest?: () => void

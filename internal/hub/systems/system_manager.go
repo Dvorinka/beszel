@@ -249,10 +249,14 @@ func (sm *SystemManager) AddSystem(sys *System) error {
 	sys.manager = sm
 	sys.ctx, sys.cancel = sys.getContext()
 	sys.data = &system.CombinedData{}
+	sys.done = make(chan struct{})
 	sm.systems.Set(sys.Id, sys)
 
 	// Start monitoring in background
-	go sys.StartUpdater()
+	go func() {
+		sys.StartUpdater()
+		close(sys.done)
+	}()
 	return nil
 }
 
@@ -260,6 +264,10 @@ func (sm *SystemManager) AddSystem(sys *System) error {
 // It cancels the system's context, closes all connections, and removes it from the store.
 // Returns an error if the system is not found.
 func (sm *SystemManager) RemoveSystem(systemID string) error {
+	return sm.removeSystem(systemID, true)
+}
+
+func (sm *SystemManager) removeSystem(systemID string, waitForUpdater bool) error {
 	system, ok := sm.systems.GetOk(systemID)
 	if !ok {
 		return errors.New("system not found")
@@ -273,6 +281,12 @@ func (sm *SystemManager) RemoveSystem(systemID string) error {
 	// Clean up all connections
 	system.closeSSHConnection()
 	system.closeWebSocketConnection()
+
+	// Wait for the updater goroutine to finish to avoid accessing a closed DB
+	if waitForUpdater && system.done != nil {
+		<-system.done
+	}
+
 	sm.systems.Remove(systemID)
 	return nil
 }
@@ -304,6 +318,11 @@ func (sm *SystemManager) AddRecord(record *core.Record, system *System) (err err
 // This method is called when an agent connects via WebSocket with valid authentication.
 // The system is immediately added to monitoring with the provided connection and version info.
 func (sm *SystemManager) AddWebSocketSystem(systemId string, agentVersion semver.Version, wsConn *ws.WsConn) error {
+	if _, err := sm.hub.DB().NewQuery("UPDATE systems SET status = {:status} WHERE id = {:id}").
+		Bind(map[string]any{"status": up, "id": systemId}).
+		Execute(); err != nil {
+		return err
+	}
 	systemRecord, err := sm.hub.FindRecordById("systems", systemId)
 	if err != nil {
 		return err

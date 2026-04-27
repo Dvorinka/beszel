@@ -12,14 +12,22 @@ export interface Domain {
 	registrar_name?: string
 	registrar_id?: string
 	registrar_url?: string
+	registry_domain_id?: string
 	name_servers?: string[]
 	mx_records?: string[]
 	txt_records?: string[]
 	ipv4_addresses?: string[]
 	ipv6_addresses?: string[]
+	dnssec?: string
 	ssl_issuer?: string
+	ssl_issuer_country?: string
+	ssl_subject?: string
+	ssl_valid_from?: string
 	ssl_valid_to?: string
 	ssl_days_until?: number
+	ssl_key_size?: number
+	ssl_signature_algo?: string
+	ssl_fingerprint?: string
 	host_country?: string
 	host_isp?: string
 	purchase_price?: number
@@ -28,12 +36,57 @@ export interface Domain {
 	auto_renew: boolean
 	alert_days_before: number
 	ssl_alert_enabled: boolean
+	registrant_name?: string
+	registrant_org?: string
+	registrant_country?: string
+	registrant_city?: string
+	registrant_state?: string
+	abuse_email?: string
+	abuse_phone?: string
 	tags?: string[]
 	notes?: string
 	favicon_url?: string
 	last_checked?: string
 	created: string
 	updated: string
+	whois_server?: string
+	whois_updated?: string
+	whois_status?: string
+	whois_registrar?: string
+	whois_registrant_name?: string
+	whois_registrant_org?: string
+	whois_registrant_country?: string
+	whois_registrant_city?: string
+	whois_registrant_state?: string
+	whois_admin_name?: string
+	whois_admin_org?: string
+	whois_admin_country?: string
+	whois_admin_city?: string
+	whois_admin_state?: string
+	whois_tech_name?: string
+	whois_tech_org?: string
+	whois_tech_country?: string
+	whois_tech_city?: string
+	whois_tech_state?: string
+	ssl_subject_alt_names?: string[]
+	ssl_san_count?: number
+	ssl_cert_type?: string
+	ssl_cert_issuer?: string
+	ssl_cert_serial_number?: string
+	ssl_cert_valid_from?: string
+	ssl_cert_valid_to?: string
+	ssl_cert_days_until?: number
+	ssl_cert_key_size?: number
+	ssl_cert_signature_algo?: string
+	ssl_cert_fingerprint?: string
+	dns_a_records?: string[]
+	dns_aaaa_records?: string[]
+	dns_ns_records?: string[]
+	dns_mx_records?: string[]
+	dns_txt_records?: string[]
+	dns_spf_records?: string[]
+	dns_dkim_records?: string[]
+	dns_dmarc_records?: string[]
 }
 
 export interface DomainHistory {
@@ -250,10 +303,27 @@ export function formatDate(dateString?: string): string {
 }
 
 export function formatDays(days?: number): string {
-	if (days === undefined || days === null) return "Unknown"
+	if (days === undefined || days === null || days === -1) return "Unknown"
 	if (days < 0) return "Expired"
 	if (days === 0) return "Today"
 	if (days === 1) return "1 day"
+	if (days >= 365) {
+		const years = Math.floor(days / 365)
+		const remaining = days % 365
+		if (remaining >= 30) {
+			const months = Math.floor(remaining / 30)
+			return `${years}y ${months}m`
+		}
+		return `${years}y`
+	}
+	if (days >= 30) {
+		const months = Math.floor(days / 30)
+		const remaining = days % 30
+		if (remaining > 0) {
+			return `${months}m ${remaining}d`
+		}
+		return `${months}m`
+	}
 	return `${days} days`
 }
 

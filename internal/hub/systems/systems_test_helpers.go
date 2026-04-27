@@ -123,5 +123,13 @@ func (s *System) StopUpdater() {
 
 func (s *System) CreateRecords(data *entities.CombinedData) (*core.Record, error) {
 	s.data = data
+	if s.ctx != nil && s.ctx.Err() != nil {
+		oldCtx, oldCancel := s.ctx, s.cancel
+		s.ctx, s.cancel = context.WithCancel(context.Background())
+		defer func() {
+			s.cancel()
+			s.ctx, s.cancel = oldCtx, oldCancel
+		}()
+	}
 	return s.createRecords(data)
 }

@@ -1,13 +1,18 @@
-import { t } from "@lingui/core/macro"
+import { memo, useEffect, useMemo } from "react"
 import { Trans } from "@lingui/react/macro"
-import { getPagePath } from "@nanostores/router"
+import { t } from "@lingui/core/macro"
+import { useQuery } from "@tanstack/react-query"
 import { DialogDescription } from "@radix-ui/react-dialog"
 import {
+	Activity,
 	AlertOctagonIcon,
+	AlertTriangle,
 	BookIcon,
+	Calendar,
 	ContainerIcon,
 	DatabaseBackupIcon,
 	FingerprintIcon,
+	GlobeIcon,
 	HardDriveIcon,
 	LogsIcon,
 	MailIcon,
@@ -16,7 +21,6 @@ import {
 	SettingsIcon,
 	UsersIcon,
 } from "lucide-react"
-import { memo, useEffect, useMemo } from "react"
 import {
 	CommandDialog,
 	CommandEmpty,
@@ -29,8 +33,11 @@ import {
 } from "@/components/ui/command"
 import { isAdmin } from "@/lib/api"
 import { $systems } from "@/lib/stores"
-import { getHostDisplayValue, listen } from "@/lib/utils"
+import { listMonitors } from "@/lib/monitors"
+import { getDomains } from "@/lib/domains"
+import { getPagePath } from "@nanostores/router"
 import { $router, basePath, navigate, prependBasePath } from "./router"
+import { getHostDisplayValue, listen } from "@/lib/utils"
 
 export default memo(function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
 	useEffect(() => {
@@ -42,6 +49,18 @@ export default memo(function CommandPalette({ open, setOpen }: { open: boolean; 
 		}
 		return listen(document, "keydown", down)
 	}, [open, setOpen])
+
+	const { data: monitors = [] } = useQuery({
+		queryKey: ["monitors"],
+		queryFn: listMonitors,
+		enabled: open,
+	})
+
+	const { data: domains = [] } = useQuery({
+		queryKey: ["domains"],
+		queryFn: getDomains,
+		enabled: open,
+	})
 
 	return useMemo(() => {
 		const systems = $systems.get()
@@ -58,7 +77,7 @@ export default memo(function CommandPalette({ open, setOpen }: { open: boolean; 
 		return (
 			<CommandDialog open={open} onOpenChange={setOpen}>
 				<DialogDescription className="sr-only">Command palette</DialogDescription>
-				<CommandInput placeholder={t`Search for systems or settings...`} />
+				<CommandInput placeholder={t`Search for systems, monitors, domains or settings...`} />
 				<CommandList>
 					{systems.length > 0 && (
 						<>
@@ -74,6 +93,44 @@ export default memo(function CommandPalette({ open, setOpen }: { open: boolean; 
 										<Server className="me-2 size-4" />
 										<span className="max-w-60 truncate">{system.name}</span>
 										<CommandShortcut>{getHostDisplayValue(system)}</CommandShortcut>
+									</CommandItem>
+								))}
+							</CommandGroup>
+							<CommandSeparator className="mb-1.5" />
+						</>
+					)}
+					{monitors.length > 0 && (
+						<>
+							<CommandGroup heading={t`Monitors`}>
+								{monitors.map((monitor) => (
+									<CommandItem
+										key={monitor.id}
+										onSelect={() => {
+											setOpen(false)
+											$router.open(getPagePath($router, "monitor", { id: monitor.id }))
+										}}
+									>
+										<Activity className="me-2 size-4" />
+										<span className="max-w-60 truncate">{monitor.name}</span>
+									</CommandItem>
+								))}
+							</CommandGroup>
+							<CommandSeparator className="mb-1.5" />
+						</>
+					)}
+					{domains.length > 0 && (
+						<>
+							<CommandGroup heading={t`Domains`}>
+								{domains.map((domain) => (
+									<CommandItem
+										key={domain.id}
+										onSelect={() => {
+											setOpen(false)
+											$router.open(getPagePath($router, "domain", { id: domain.id }))
+										}}
+									>
+										<GlobeIcon className="me-2 size-4" />
+										<span className="max-w-60 truncate">{domain.domain_name}</span>
 									</CommandItem>
 								))}
 							</CommandGroup>
@@ -97,6 +154,7 @@ export default memo(function CommandPalette({ open, setOpen }: { open: boolean; 
 							</CommandShortcut>
 						</CommandItem>
 						<CommandItem
+							keywords={["containers", "docker", "podman"]}
 							onSelect={() => {
 								navigate(getPagePath($router, "containers"))
 								setOpen(false)
@@ -118,6 +176,66 @@ export default memo(function CommandPalette({ open, setOpen }: { open: boolean; 
 						>
 							<HardDriveIcon className="me-2 size-4" />
 							<span>S.M.A.R.T.</span>
+							<CommandShortcut>
+								<Trans>Page</Trans>
+							</CommandShortcut>
+						</CommandItem>
+						<CommandItem
+							keywords={["monitoring", "monitors", "domains", "websites"]}
+							onSelect={() => {
+								navigate(getPagePath($router, "monitoring"))
+								setOpen(false)
+							}}
+						>
+							<Activity className="me-2 size-4" />
+							<span>
+								<Trans>Monitoring</Trans>
+							</span>
+							<CommandShortcut>
+								<Trans>Page</Trans>
+							</CommandShortcut>
+						</CommandItem>
+						<CommandItem
+							keywords={["status", "public"]}
+							onSelect={() => {
+								navigate(getPagePath($router, "status_pages"))
+								setOpen(false)
+							}}
+						>
+							<GlobeIcon className="me-2 size-4" />
+							<span>
+								<Trans>Status Pages</Trans>
+							</span>
+							<CommandShortcut>
+								<Trans>Page</Trans>
+							</CommandShortcut>
+						</CommandItem>
+						<CommandItem
+							keywords={["incidents", "problems"]}
+							onSelect={() => {
+								navigate(getPagePath($router, "incidents"))
+								setOpen(false)
+							}}
+						>
+							<AlertTriangle className="me-2 size-4" />
+							<span>
+								<Trans>Incidents</Trans>
+							</span>
+							<CommandShortcut>
+								<Trans>Page</Trans>
+							</CommandShortcut>
+						</CommandItem>
+						<CommandItem
+							keywords={["calendar", "expiry", "ssl"]}
+							onSelect={() => {
+								navigate(getPagePath($router, "calendar"))
+								setOpen(false)
+							}}
+						>
+							<Calendar className="me-2 size-4" />
+							<span>
+								<Trans>Calendar</Trans>
+							</span>
 							<CommandShortcut>
 								<Trans>Page</Trans>
 							</CommandShortcut>

@@ -1,6 +1,6 @@
 package system
 
-// TODO: this is confusing, make common package with common/types common/helpers etc
+// NOTE: consider refactoring into common/types and common/helpers packages
 
 import (
 	"encoding/json"
@@ -40,7 +40,7 @@ type Stats struct {
 	// LoadAvg15      float64             `json:"l15,omitempty" cbor:"25,keyasint,omitempty"`
 	Bandwidth    [2]uint64 `json:"b,omitzero" cbor:"26,keyasint,omitzero"` // [sent bytes, recv bytes]
 	MaxBandwidth [2]uint64 `json:"bm,omitzero" cbor:"-"`                   // [sent bytes, recv bytes]
-	// TODO: remove other load fields in future release in favor of load avg array
+	// NOTE: load avg array replaces individual load fields in future versions
 	LoadAvg           [3]float64           `json:"la,omitempty" cbor:"28,keyasint"`
 	Battery           [2]uint8             `json:"bat,omitzero" cbor:"29,keyasint,omitzero"`    // [percent, charge state, current]
 	NetworkInterfaces map[string][4]uint64 `json:"ni,omitempty" cbor:"31,keyasint,omitempty"`   // [upload bytes, download bytes, total upload, total download]
@@ -94,7 +94,7 @@ type FsStats struct {
 	DiskWritePs    float64   `json:"w" cbor:"3,keyasint"`
 	MaxDiskReadPS  float64   `json:"rm,omitempty" cbor:"-"`
 	MaxDiskWritePS float64   `json:"wm,omitempty" cbor:"-"`
-	// TODO: remove DiskReadPs and DiskWritePs in future release in favor of DiskReadBytes and DiskWriteBytes
+	// NOTE: DiskReadPs and DiskWritePs deprecated in favor of DiskReadBytes and DiskWriteBytes
 	DiskReadBytes     uint64     `json:"rb" cbor:"6,keyasint,omitempty"`
 	DiskWriteBytes    uint64     `json:"wb" cbor:"7,keyasint,omitempty"`
 	MaxDiskReadBytes  uint64     `json:"rbm,omitempty" cbor:"-"`

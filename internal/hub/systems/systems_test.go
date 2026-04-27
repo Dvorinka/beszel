@@ -19,17 +19,17 @@ import (
 )
 
 func TestSystemManagerNew(t *testing.T) {
-	hub, err := tests.NewTestHub(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer hub.Cleanup()
-	sm := hub.GetSystemManager()
-
-	user, err := tests.CreateUser(hub, "test@test.com", "testtesttest")
-	require.NoError(t, err)
-
 	synctest.Test(t, func(t *testing.T) {
+		hub, err := tests.NewTestHub(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer hub.Cleanup()
+		sm := hub.GetSystemManager()
+
+		user, err := tests.CreateUser(hub, "test@test.com", "testtesttest")
+		require.NoError(t, err)
+
 		sm.Initialize()
 
 		record, err := tests.CreateRecord(hub, "systems", map[string]any{
@@ -110,11 +110,7 @@ func TestSystemManagerNew(t *testing.T) {
 		err = hub.Delete(record)
 		require.NoError(t, err)
 		assert.False(t, sm.HasSystem(record.Id), "System should not exist in the store after deletion")
-	})
 
-	testOld(t, hub)
-
-	synctest.Test(t, func(t *testing.T) {
 		time.Sleep(time.Second)
 		synctest.Wait()
 
@@ -126,8 +122,20 @@ func TestSystemManagerNew(t *testing.T) {
 
 		assert.Equal(t, 0, sm.GetSystemCount(), "System count should be 0")
 
-		// TODO: test with websocket client
+		// NOTE: extend with websocket client integration tests
 	})
+
+	hub, err := tests.NewTestHub(t.TempDir())
+	require.NoError(t, err)
+	defer hub.Cleanup()
+
+	sm := hub.GetSystemManager()
+	sm.Initialize()
+
+	_, err = tests.CreateUser(hub, "test@test.com", "testtesttest")
+	require.NoError(t, err)
+
+	testOld(t, hub)
 }
 
 func testOld(t *testing.T, hub *tests.TestHub) {
@@ -141,7 +149,7 @@ func testOld(t *testing.T, hub *tests.TestHub) {
 	_, err = tests.CreateUser(hub, "test@test.com", "testtesttest")
 	require.Error(t, err)
 
-	// Test collection existence. todo: move to hub package tests
+	// Test collection existence
 	t.Run("CollectionExistence", func(t *testing.T) {
 		// Verify that required collections exist
 		systems, err := hub.FindCachedCollectionByNameOrId("systems")
@@ -294,7 +302,7 @@ func testOld(t *testing.T, hub *tests.TestHub) {
 			Containers: []*container.Stats{},
 		}
 
-		// Test handling system data. todo: move to hub/alerts package tests
+		// Test handling system data
 		err = hub.HandleSystemAlerts(record, testData)
 		assert.NoError(t, err)
 	})
