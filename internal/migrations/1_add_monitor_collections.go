@@ -839,6 +839,508 @@ func init() {
 				"CREATE INDEX idx_update_incident ON incident_updates (incident)",
 				"CREATE INDEX idx_update_created ON incident_updates (created_at)"
 			]
+		},
+		{
+			"id": "status_pages_collection_001",
+			"name": "status_pages",
+			"type": "base",
+			"listRule": "@request.auth.id != '' && user = @request.auth.id",
+			"viewRule": "@request.auth.id != '' && user = @request.auth.id",
+			"createRule": "@request.auth.id != '' && user = @request.auth.id && @request.auth.role != 'readonly'",
+			"updateRule": "@request.auth.id != '' && user = @request.auth.id && @request.auth.role != 'readonly'",
+			"deleteRule": "@request.auth.id != '' && user = @request.auth.id && @request.auth.role != 'readonly'",
+			"fields": [
+				{
+					"id": "id_field",
+					"name": "id",
+					"type": "text",
+					"system": true,
+					"required": true,
+					"primaryKey": true,
+					"autogeneratePattern": "[a-z0-9]{15}",
+					"max": 15,
+					"min": 15,
+					"pattern": "^[a-z0-9]+$"
+				},
+				{
+					"id": "name_field",
+					"name": "name",
+					"type": "text",
+					"required": true
+				},
+				{
+					"id": "slug_field",
+					"name": "slug",
+					"type": "text",
+					"required": true
+				},
+				{
+					"id": "title_field",
+					"name": "title",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "description_field",
+					"name": "description",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "logo_field",
+					"name": "logo",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "favicon_field",
+					"name": "favicon",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "theme_field",
+					"name": "theme",
+					"type": "select",
+					"required": false,
+					"values": ["light", "dark", "auto"]
+				},
+				{
+					"id": "custom_css_field",
+					"name": "custom_css",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "public_field",
+					"name": "public",
+					"type": "bool",
+					"required": false
+				},
+				{
+					"id": "show_uptime_field",
+					"name": "show_uptime",
+					"type": "bool",
+					"required": false
+				},
+				{
+					"id": "user_field",
+					"name": "user",
+					"type": "relation",
+					"required": true,
+					"collectionId": "_pb_users_auth_",
+					"maxSelect": 1
+				},
+				{
+					"id": "created_field",
+					"name": "created",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": false
+				},
+				{
+					"id": "updated_field",
+					"name": "updated",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": true
+				}
+			],
+			"indexes": [
+				"CREATE UNIQUE INDEX idx_status_page_slug ON status_pages (slug)",
+				"CREATE INDEX idx_status_page_user ON status_pages (user)"
+			]
+		},
+		{
+			"id": "status_page_monitors_collection_001",
+			"name": "status_page_monitors",
+			"type": "base",
+			"listRule": "@request.auth.id != '' && user = @request.auth.id",
+			"viewRule": "@request.auth.id != '' && user = @request.auth.id",
+			"createRule": null,
+			"updateRule": null,
+			"deleteRule": "@request.auth.id != '' && user = @request.auth.id",
+			"fields": [
+				{
+					"id": "id_field",
+					"name": "id",
+					"type": "text",
+					"system": true,
+					"required": true,
+					"primaryKey": true,
+					"autogeneratePattern": "[a-z0-9]{15}",
+					"max": 15,
+					"min": 15,
+					"pattern": "^[a-z0-9]+$"
+				},
+				{
+					"id": "status_page_field",
+					"name": "status_page",
+					"type": "relation",
+					"required": true,
+					"collectionId": "status_pages_collection_001",
+					"maxSelect": 1,
+					"cascadeDelete": true
+				},
+				{
+					"id": "monitor_field",
+					"name": "monitor",
+					"type": "relation",
+					"required": true,
+					"collectionId": "monitors_collection_001",
+					"maxSelect": 1
+				},
+				{
+					"id": "display_name_field",
+					"name": "display_name",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "group_field",
+					"name": "group",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "sort_order_field",
+					"name": "sort_order",
+					"type": "number",
+					"required": false,
+					"onlyInt": true
+				},
+				{
+					"id": "user_field",
+					"name": "user",
+					"type": "relation",
+					"required": true,
+					"collectionId": "_pb_users_auth_",
+					"maxSelect": 1
+				},
+				{
+					"id": "created_field",
+					"name": "created",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": false
+				}
+			],
+			"indexes": [
+				"CREATE INDEX idx_status_page_monitor_page ON status_page_monitors (status_page)",
+				"CREATE INDEX idx_status_page_monitor_monitor ON status_page_monitors (monitor)"
+			]
+		},
+		{
+			"id": "maintenance_windows_collection_001",
+			"name": "maintenance_windows",
+			"type": "base",
+			"listRule": "@request.auth.id != '' && user = @request.auth.id",
+			"viewRule": "@request.auth.id != '' && user = @request.auth.id",
+			"createRule": "@request.auth.id != '' && user = @request.auth.id && @request.auth.role != 'readonly'",
+			"updateRule": "@request.auth.id != '' && user = @request.auth.id && @request.auth.role != 'readonly'",
+			"deleteRule": "@request.auth.id != '' && user = @request.auth.id && @request.auth.role != 'readonly'",
+			"fields": [
+				{
+					"id": "id_field",
+					"name": "id",
+					"type": "text",
+					"system": true,
+					"required": true,
+					"primaryKey": true,
+					"autogeneratePattern": "[a-z0-9]{15}",
+					"max": 15,
+					"min": 15,
+					"pattern": "^[a-z0-9]+$"
+				},
+				{
+					"id": "name_field",
+					"name": "name",
+					"type": "text",
+					"required": true
+				},
+				{
+					"id": "description_field",
+					"name": "description",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "monitor_field",
+					"name": "monitor",
+					"type": "relation",
+					"required": false,
+					"collectionId": "monitors_collection_001",
+					"maxSelect": 1
+				},
+				{
+					"id": "domain_field",
+					"name": "domain",
+					"type": "relation",
+					"required": false,
+					"collectionId": "domains_collection_001",
+					"maxSelect": 1
+				},
+				{
+					"id": "start_time_field",
+					"name": "start_time",
+					"type": "date",
+					"required": true
+				},
+				{
+					"id": "end_time_field",
+					"name": "end_time",
+					"type": "date",
+					"required": true
+				},
+				{
+					"id": "recurring_field",
+					"name": "recurring",
+					"type": "bool",
+					"required": false
+				},
+				{
+					"id": "recurrence_pattern_field",
+					"name": "recurrence_pattern",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "status_field",
+					"name": "status",
+					"type": "select",
+					"required": true,
+					"values": ["scheduled", "in_progress", "completed", "cancelled"]
+				},
+				{
+					"id": "suppress_alerts_field",
+					"name": "suppress_alerts",
+					"type": "bool",
+					"required": false
+				},
+				{
+					"id": "user_field",
+					"name": "user",
+					"type": "relation",
+					"required": true,
+					"collectionId": "_pb_users_auth_",
+					"maxSelect": 1
+				},
+				{
+					"id": "created_field",
+					"name": "created",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": false
+				},
+				{
+					"id": "updated_field",
+					"name": "updated",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": true
+				}
+			],
+			"indexes": [
+				"CREATE INDEX idx_maintenance_user ON maintenance_windows (user)",
+				"CREATE INDEX idx_maintenance_monitor ON maintenance_windows (monitor)",
+				"CREATE INDEX idx_maintenance_domain ON maintenance_windows (domain)",
+				"CREATE INDEX idx_maintenance_status ON maintenance_windows (status)",
+				"CREATE INDEX idx_maintenance_time ON maintenance_windows (start_time, end_time)"
+			]
+		},
+		{
+			"id": "subdomains_collection_001",
+			"name": "subdomains",
+			"type": "base",
+			"listRule": "@request.auth.id != '' && user = @request.auth.id",
+			"viewRule": "@request.auth.id != '' && user = @request.auth.id",
+			"createRule": null,
+			"updateRule": null,
+			"deleteRule": "@request.auth.id != '' && user = @request.auth.id",
+			"fields": [
+				{
+					"id": "id_field",
+					"name": "id",
+					"type": "text",
+					"system": true,
+					"required": true,
+					"primaryKey": true,
+					"autogeneratePattern": "[a-z0-9]{15}",
+					"max": 15,
+					"min": 15,
+					"pattern": "^[a-z0-9]+$"
+				},
+				{
+					"id": "domain_field",
+					"name": "domain",
+					"type": "relation",
+					"required": true,
+					"collectionId": "domains_collection_001",
+					"maxSelect": 1,
+					"cascadeDelete": true
+				},
+				{
+					"id": "subdomain_name_field",
+					"name": "subdomain_name",
+					"type": "text",
+					"required": true
+				},
+				{
+					"id": "status_field",
+					"name": "status",
+					"type": "select",
+					"required": true,
+					"values": ["active", "inactive", "unknown"]
+				},
+				{
+					"id": "ip_addresses_field",
+					"name": "ip_addresses",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "last_checked_field",
+					"name": "last_checked",
+					"type": "date",
+					"required": false
+				},
+				{
+					"id": "user_field",
+					"name": "user",
+					"type": "relation",
+					"required": true,
+					"collectionId": "_pb_users_auth_",
+					"maxSelect": 1
+				},
+				{
+					"id": "created_field",
+					"name": "created",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": false
+				}
+			],
+			"indexes": [
+				"CREATE INDEX idx_subdomain_domain ON subdomains (domain)",
+				"CREATE INDEX idx_subdomain_user ON subdomains (user)",
+				"CREATE INDEX idx_subdomain_name ON subdomains (subdomain_name)"
+			]
+		},
+		{
+			"id": "badges_collection_001",
+			"name": "badges",
+			"type": "base",
+			"listRule": "@request.auth.id != '' && user = @request.auth.id",
+			"viewRule": "@request.auth.id != '' && user = @request.auth.id",
+			"createRule": "@request.auth.id != '' && user = @request.auth.id",
+			"updateRule": "@request.auth.id != '' && user = @request.auth.id",
+			"deleteRule": "@request.auth.id != '' && user = @request.auth.id",
+			"fields": [
+				{
+					"id": "id_field",
+					"name": "id",
+					"type": "text",
+					"system": true,
+					"required": true,
+					"primaryKey": true,
+					"autogeneratePattern": "[a-z0-9]{15}",
+					"max": 15,
+					"min": 15,
+					"pattern": "^[a-z0-9]+$"
+				},
+				{
+					"id": "name_field",
+					"name": "name",
+					"type": "text",
+					"required": true
+				},
+				{
+					"id": "type_field",
+					"name": "type",
+					"type": "select",
+					"required": true,
+					"values": ["status", "uptime", "response", "domain"]
+				},
+				{
+					"id": "monitor_field",
+					"name": "monitor",
+					"type": "relation",
+					"required": false,
+					"collectionId": "monitors_collection_001",
+					"maxSelect": 1
+				},
+				{
+					"id": "domain_field",
+					"name": "domain",
+					"type": "relation",
+					"required": false,
+					"collectionId": "domains_collection_001",
+					"maxSelect": 1
+				},
+				{
+					"id": "system_field",
+					"name": "system",
+					"type": "relation",
+					"required": false,
+					"collectionId": "2hz5ncl8tizk5nx",
+					"maxSelect": 1
+				},
+				{
+					"id": "status_page_field",
+					"name": "status_page",
+					"type": "relation",
+					"required": false,
+					"collectionId": "status_pages_collection_001",
+					"maxSelect": 1
+				},
+				{
+					"id": "label_field",
+					"name": "label",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "color_field",
+					"name": "color",
+					"type": "text",
+					"required": false
+				},
+				{
+					"id": "style_field",
+					"name": "style",
+					"type": "select",
+					"required": false,
+					"values": ["flat", "flat-square", "plastic", "for-the-badge"]
+				},
+				{
+					"id": "user_field",
+					"name": "user",
+					"type": "relation",
+					"required": true,
+					"collectionId": "_pb_users_auth_",
+					"maxSelect": 1
+				},
+				{
+					"id": "created_field",
+					"name": "created",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": false
+				},
+				{
+					"id": "updated_field",
+					"name": "updated",
+					"type": "autodate",
+					"onCreate": true,
+					"onUpdate": true
+				}
+			],
+			"indexes": [
+				"CREATE INDEX idx_badge_user ON badges (user)",
+				"CREATE INDEX idx_badge_monitor ON badges (monitor)",
+				"CREATE INDEX idx_badge_domain ON badges (domain)",
+				"CREATE INDEX idx_badge_system ON badges (system)"
+			]
 		}
 	]`
 

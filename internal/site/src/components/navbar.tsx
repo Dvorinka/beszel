@@ -1,4 +1,3 @@
-import { t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
 import {
@@ -8,7 +7,7 @@ import {
 	LogOutIcon,
 	LogsIcon,
 	MenuIcon,
-	PlusIcon,
+	MonitorIcon,
 	SearchIcon,
 	ServerIcon,
 	SettingsIcon,
@@ -31,7 +30,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { isAdmin, isReadOnlyUser, logOut, pb } from "@/lib/api"
 import { cn, runOnce } from "@/lib/utils"
-import { AddSystemDialog } from "./add-system"
 import { LangToggle } from "./lang-toggle"
 import { Logo } from "./logo"
 import { ModeToggle } from "./mode-toggle"
@@ -43,19 +41,15 @@ const CommandPalette = lazy(() => import("./command-palette"))
 const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
 
 export default function Navbar() {
-	const [addSystemDialogOpen, setAddSystemDialogOpen] = useState(false)
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
 	const AdminLinks = AdminDropdownGroup()
-
-	const systemTranslation = t`System`
 
 	return (
 		<div className="flex items-center h-14 md:h-16 bg-card px-4 pe-3 sm:px-6 border border-border/60 bt-0 rounded-md my-4">
 			<Suspense>
 				<CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
 			</Suspense>
-			<AddSystemDialog open={addSystemDialogOpen} setOpen={setAddSystemDialogOpen} />
 
 			<Link
 				href={basePath}
@@ -109,6 +103,10 @@ export default function Navbar() {
 								<HardDriveIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
 								<span>S.M.A.R.T.</span>
 							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => navigate(getPagePath($router, "monitoring"))} className="flex items-center">
+								<MonitorIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
+								<Trans>Monitoring</Trans>
+							</DropdownMenuItem>
 							<DropdownMenuItem
 								onClick={() => navigate(getPagePath($router, "settings", { name: "general" }))}
 								className="flex items-center"
@@ -124,17 +122,6 @@ export default function Navbar() {
 									</DropdownMenuSubTrigger>
 									<DropdownMenuSubContent>{AdminLinks}</DropdownMenuSubContent>
 								</DropdownMenuSub>
-							)}
-							{!isReadOnlyUser() && (
-								<DropdownMenuItem
-									className="flex items-center"
-									onSelect={() => {
-										setAddSystemDialogOpen(true)
-									}}
-								>
-									<PlusIcon className="h-4 w-4 me-2.5" />
-									<Trans>Add {{ foo: systemTranslation }}</Trans>
-								</DropdownMenuItem>
 							)}
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
@@ -178,7 +165,24 @@ export default function Navbar() {
 							<HardDriveIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
 						</Link>
 					</TooltipTrigger>
+					<TooltipContent>
+						<span>S.M.A.R.T.</span>
+					</TooltipContent>
 					<TooltipContent>S.M.A.R.T.</TooltipContent>
+				</Tooltip>
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Link
+							href={getPagePath($router, "monitoring")}
+							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+							aria-label="Monitoring"
+						>
+							<MonitorIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
+						</Link>
+					</TooltipTrigger>
+					<TooltipContent>
+						<Trans>Monitoring</Trans>
+					</TooltipContent>
 				</Tooltip>
 				<LangToggle />
 				<ModeToggle />
@@ -219,12 +223,6 @@ export default function Navbar() {
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
-				{!isReadOnlyUser() && (
-					<Button variant="outline" className="flex gap-1 ms-2" onClick={() => setAddSystemDialogOpen(true)}>
-						<PlusIcon className="h-4 w-4 -ms-1" />
-						<Trans>Add {{ foo: systemTranslation }}</Trans>
-					</Button>
-				)}
 			</div>
 		</div>
 	)

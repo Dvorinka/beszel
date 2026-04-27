@@ -40,6 +40,9 @@ func (h *APIHandler) RegisterRoutes(se *core.ServeEvent) {
 	api.DELETE("/{id}", h.deleteDomain)
 	api.POST("/{id}/refresh", h.refreshDomain)
 	api.GET("/{id}/history", h.getDomainHistory)
+	api.GET("/{id}/stats", h.getDomainStats)
+	api.POST("/{id}/pause", h.pauseDomain)
+	api.POST("/{id}/resume", h.resumeDomain)
 }
 
 // listDomains lists all domains for the authenticated user
@@ -164,9 +167,21 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 		ctx := e.Request.Context()
 		domainData, err := lookupSvc.LookupDomain(ctx, domainName)
 		if err == nil && domainData != nil {
-			record.Set("expiry_date", domainData.ExpiryDate)
-			record.Set("creation_date", domainData.CreationDate)
-			record.Set("updated_date", domainData.UpdatedDate)
+			if domainData.ExpiryDate != nil {
+				record.Set("expiry_date", *domainData.ExpiryDate)
+			} else {
+				record.Set("expiry_date", "")
+			}
+			if domainData.CreationDate != nil {
+				record.Set("creation_date", *domainData.CreationDate)
+			} else {
+				record.Set("creation_date", "")
+			}
+			if domainData.UpdatedDate != nil {
+				record.Set("updated_date", *domainData.UpdatedDate)
+			} else {
+				record.Set("updated_date", "")
+			}
 			record.Set("registrar_name", domainData.RegistrarName)
 			record.Set("registrar_id", domainData.RegistrarID)
 			record.Set("registrar_url", domainData.RegistrarURL)
@@ -177,7 +192,11 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 			record.Set("ipv4_addresses", domainData.IPv4Addresses)
 			record.Set("ipv6_addresses", domainData.IPv6Addresses)
 			record.Set("ssl_issuer", domainData.SSLIssuer)
-			record.Set("ssl_valid_to", domainData.SSLValidTo)
+			if domainData.SSLValidTo != nil {
+				record.Set("ssl_valid_to", *domainData.SSLValidTo)
+			} else {
+				record.Set("ssl_valid_to", "")
+			}
 			record.Set("host_country", domainData.HostCountry)
 			record.Set("host_isp", domainData.HostISP)
 			record.Set("favicon_url", domainData.FaviconURL)
@@ -360,6 +379,140 @@ func (h *APIHandler) getDomainHistory(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, history)
 }
 
+// getDomainStats gets domain health statistics
+func (h *APIHandler) getDomainStats(e *core.RequestEvent) error {
+	authRecord := e.Auth
+	if authRecord == nil {
+		return e.UnauthorizedError("unauthorized", nil)
+	}
+
+	id := e.Request.PathValue("id")
+
+	// Verify domain ownership
+	domain, err := h.app.FindRecordById("domains", id)
+	if err != nil {
+		return e.NotFoundError("domain not found", err)
+	}
+	if domain.GetString("user") != authRecord.Id {
+		return e.ForbiddenError("not authorized", nil)
+	}
+
+	// Calculate stats from domain history
+	stats := h.calculateDomainStats(id)
+
+	return e.JSON(http.StatusOK, stats)
+}
+
+// calculateDomainStats calculates health statistics from domain history
+func (h *APIHandler) calculateDomainStats(domainID string) map[string]interface{} {
+	// Get history for the last 30 days
+	since := time.Now().AddDate(0, 0, -30)
+	records, _ := h.app.FindRecordsByFilter(
+		"domain_history",
+		"domain = {:domain} && created_at >= {:since}",
+		"-created_at",
+		0, 0,
+		dbx.Params{
+			"domain": domainID,
+			"since":  since.Format("2006-01-02 15:04:05"),
+		},
+	)
+
+	totalChanges := len(records)
+	expiryChanges := 0
+	sslChanges := 0
+	statusChanges := 0
+
+	for _, record := range records {
+		switch record.GetString("change_type") {
+		case "expiry":
+			expiryChanges++
+		case "ssl":
+			sslChanges++
+		case "status":
+			statusChanges++
+		}
+	}
+
+	// Get incidents count
+	incidentRecords, _ := h.app.FindRecordsByFilter(
+		"incidents",
+		"domain = {:domain}",
+		"-created",
+		0, 0,
+		dbx.Params{"domain": domainID},
+	)
+
+	return map[string]interface{}{
+		"total_changes":   totalChanges,
+		"expiry_changes":  expiryChanges,
+		"ssl_changes":     sslChanges,
+		"status_changes":  statusChanges,
+		"incidents_count": len(incidentRecords),
+		"period_days":     30,
+	}
+}
+
+// pauseDomain pauses domain monitoring
+func (h *APIHandler) pauseDomain(e *core.RequestEvent) error {
+	authRecord := e.Auth
+	if authRecord == nil {
+		return e.UnauthorizedError("unauthorized", nil)
+	}
+
+	id := e.Request.PathValue("id")
+	record, err := h.app.FindRecordById("domains", id)
+	if err != nil {
+		return e.NotFoundError("domain not found", err)
+	}
+
+	if record.GetString("user") != authRecord.Id {
+		return e.ForbiddenError("not authorized", nil)
+	}
+
+	record.Set("active", false)
+	record.Set("status", "paused")
+
+	if err := h.app.Save(record); err != nil {
+		return e.InternalServerError("failed to pause domain", err)
+	}
+
+	return e.JSON(http.StatusOK, h.recordToResponse(record))
+}
+
+// resumeDomain resumes domain monitoring
+func (h *APIHandler) resumeDomain(e *core.RequestEvent) error {
+	authRecord := e.Auth
+	if authRecord == nil {
+		return e.UnauthorizedError("unauthorized", nil)
+	}
+
+	id := e.Request.PathValue("id")
+	record, err := h.app.FindRecordById("domains", id)
+	if err != nil {
+		return e.NotFoundError("domain not found", err)
+	}
+
+	if record.GetString("user") != authRecord.Id {
+		return e.ForbiddenError("not authorized", nil)
+	}
+
+	record.Set("active", true)
+	// Reset status - scheduler will update on next check
+	record.Set("status", "unknown")
+
+	if err := h.app.Save(record); err != nil {
+		return e.InternalServerError("failed to resume domain", err)
+	}
+
+	// Trigger immediate refresh
+	if h.scheduler != nil {
+		h.scheduler.RefreshDomain(id)
+	}
+
+	return e.JSON(http.StatusOK, h.recordToResponse(record))
+}
+
 // recordToResponse converts a record to API response
 func (h *APIHandler) recordToResponse(record *core.Record) map[string]interface{} {
 	expiryDate := record.GetDateTime("expiry_date").Time()
@@ -376,37 +529,62 @@ func (h *APIHandler) recordToResponse(record *core.Record) map[string]interface{
 		sslDaysUntil = int(time.Until(sslValidTo).Hours() / 24)
 	}
 
-	return map[string]interface{}{
-		"id":                record.Id,
-		"domain_name":       record.GetString("domain_name"),
-		"status":            record.GetString("status"),
-		"active":            record.GetBool("active"),
-		"expiry_date":       expiryDate,
-		"creation_date":     record.GetDateTime("creation_date").String(),
-		"updated_date":      record.GetDateTime("updated_date").String(),
-		"days_until_expiry": daysUntilExpiry,
-		"registrar_name":    record.GetString("registrar_name"),
-		"registrar_id":      record.GetString("registrar_id"),
-		"name_servers":      record.Get("name_servers"),
-		"ipv4_addresses":    record.Get("ipv4_addresses"),
-		"ssl_issuer":        record.GetString("ssl_issuer"),
-		"ssl_valid_to":      sslValidTo,
-		"ssl_days_until":    sslDaysUntil,
-		"host_country":      record.GetString("host_country"),
-		"host_isp":          record.GetString("host_isp"),
-		"purchase_price":    record.GetFloat("purchase_price"),
-		"current_value":     record.GetFloat("current_value"),
-		"renewal_cost":      record.GetFloat("renewal_cost"),
-		"auto_renew":        record.GetBool("auto_renew"),
-		"alert_days_before": record.GetInt("alert_days_before"),
-		"ssl_alert_enabled": record.GetBool("ssl_alert_enabled"),
-		"tags":              record.Get("tags"),
-		"notes":             record.GetString("notes"),
-		"favicon_url":       record.GetString("favicon_url"),
-		"last_checked":      record.GetDateTime("last_checked").String(),
-		"created":           record.GetDateTime("created").String(),
-		"updated":           record.GetDateTime("updated").String(),
+	resp := map[string]interface{}{
+		"id":                 record.Id,
+		"domain_name":        record.GetString("domain_name"),
+		"status":             record.GetString("status"),
+		"active":             record.GetBool("active"),
+		"days_until_expiry":  daysUntilExpiry,
+		"registrar_name":     record.GetString("registrar_name"),
+		"registrar_id":       record.GetString("registrar_id"),
+		"name_servers":       record.Get("name_servers"),
+		"ipv4_addresses":     record.Get("ipv4_addresses"),
+		"ssl_issuer":         record.GetString("ssl_issuer"),
+		"ssl_issuer_country": record.GetString("ssl_issuer_country"),
+		"ssl_subject":        record.GetString("ssl_subject"),
+		"ssl_days_until":     sslDaysUntil,
+		"ssl_fingerprint":    record.GetString("ssl_fingerprint"),
+		"ssl_key_size":       record.GetInt("ssl_key_size"),
+		"ssl_signature_algo": record.GetString("ssl_signature_algo"),
+		"host_country":       record.GetString("host_country"),
+		"host_isp":           record.GetString("host_isp"),
+		"purchase_price":     record.GetFloat("purchase_price"),
+		"current_value":      record.GetFloat("current_value"),
+		"renewal_cost":       record.GetFloat("renewal_cost"),
+		"auto_renew":         record.GetBool("auto_renew"),
+		"alert_days_before":  record.GetInt("alert_days_before"),
+		"ssl_alert_enabled":  record.GetBool("ssl_alert_enabled"),
+		"tags":               record.Get("tags"),
+		"notes":              record.GetString("notes"),
+		"favicon_url":        record.GetString("favicon_url"),
+		"created":            record.GetDateTime("created").String(),
+		"updated":            record.GetDateTime("updated").String(),
 	}
+
+	if !expiryDate.IsZero() {
+		resp["expiry_date"] = expiryDate.Format("2006-01-02T15:04:05Z")
+	}
+	creationDate := record.GetDateTime("creation_date").Time()
+	if !creationDate.IsZero() {
+		resp["creation_date"] = creationDate.Format("2006-01-02T15:04:05Z")
+	}
+	updatedDate := record.GetDateTime("updated_date").Time()
+	if !updatedDate.IsZero() {
+		resp["updated_date"] = updatedDate.Format("2006-01-02T15:04:05Z")
+	}
+	sslValidFrom := record.GetDateTime("ssl_valid_from").Time()
+	if !sslValidFrom.IsZero() {
+		resp["ssl_valid_from"] = sslValidFrom.Format("2006-01-02T15:04:05Z")
+	}
+	if !sslValidTo.IsZero() {
+		resp["ssl_valid_to"] = sslValidTo.Format("2006-01-02T15:04:05Z")
+	}
+	lastChecked := record.GetDateTime("last_checked").Time()
+	if !lastChecked.IsZero() {
+		resp["last_checked"] = lastChecked.Format("2006-01-02T15:04:05Z")
+	}
+
+	return resp
 }
 
 // cleanDomain cleans and normalizes a domain name

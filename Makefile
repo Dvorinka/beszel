@@ -41,7 +41,7 @@ endif
 # Set executable extension based on target OS
 EXE_EXT := $(if $(filter windows,$(OS)),.exe,)
 
-.PHONY: tidy build-agent build-hub build-hub-dev build clean lint dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional
+.PHONY: tidy build-agent build-hub build-hub-dev build clean lint test dev-server dev-agent dev-hub dev generate-locales fetch-smartctl-conditional docker-hub docker-agent docker-compose-up docker-compose-down start stop restart logs logs-hub
 .DEFAULT_GOAL := build
 
 clean:
@@ -139,3 +139,32 @@ build-dotnet:
 
 # KEY="..." make -j dev
 dev: dev-server dev-hub dev-agent
+
+# Docker builds
+docker-hub:
+	docker build --target hub -t beszel-hub:latest .
+
+docker-agent:
+	docker build --target agent -t beszel-agent:latest .
+
+# Easy compose targets
+start:
+	docker compose up -d --build
+
+stop:
+	docker compose down
+
+restart: stop start
+
+logs:
+	docker compose logs -f
+
+logs-hub:
+	docker compose logs -f beszel-hub
+
+# Legacy compose targets
+docker-compose-up:
+	docker compose up -d beszel-hub
+
+docker-compose-down:
+	docker compose down

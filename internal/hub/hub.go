@@ -12,11 +12,17 @@ import (
 	"strings"
 
 	"github.com/henrygd/beszel/internal/alerts"
+	"github.com/henrygd/beszel/internal/hub/badges"
+	"github.com/henrygd/beszel/internal/hub/bulk"
 	"github.com/henrygd/beszel/internal/hub/config"
 	"github.com/henrygd/beszel/internal/hub/domains"
 	"github.com/henrygd/beszel/internal/hub/export"
 	"github.com/henrygd/beszel/internal/hub/heartbeat"
+	"github.com/henrygd/beszel/internal/hub/incidents"
+	"github.com/henrygd/beszel/internal/hub/maintenance"
 	"github.com/henrygd/beszel/internal/hub/monitors"
+	"github.com/henrygd/beszel/internal/hub/settings"
+	"github.com/henrygd/beszel/internal/hub/statuspages"
 	"github.com/henrygd/beszel/internal/hub/systems"
 	"github.com/henrygd/beszel/internal/hub/utils"
 	"github.com/henrygd/beszel/internal/records"
@@ -31,19 +37,26 @@ import (
 type Hub struct {
 	core.App
 	*alerts.AlertManager
-	um          *users.UserManager
-	rm          *records.RecordManager
-	sm          *systems.SystemManager
-	monSched    *monitors.Scheduler
-	monAPI      *monitors.APIHandler
-	domainSched *domains.Scheduler
-	domainAPI   *domains.APIHandler
-	exportAPI   *export.APIHandler
-	hb          *heartbeat.Heartbeat
-	hbStop      chan struct{}
-	pubKey      string
-	signer      ssh.Signer
-	appURL      string
+	um             *users.UserManager
+	rm             *records.RecordManager
+	sm             *systems.SystemManager
+	monSched       *monitors.Scheduler
+	monAPI         *monitors.APIHandler
+	domainSched    *domains.Scheduler
+	domainAPI      *domains.APIHandler
+	exportAPI      *export.APIHandler
+	statusPageAPI  *statuspages.APIHandler
+	maintenanceAPI *maintenance.APIHandler
+	bulkAPI        *bulk.APIHandler
+	incidentAPI    *incidents.APIHandler
+	badgeAPI       *badges.APIHandler
+	settingsAPI    *settings.APIHandler
+	hb             *heartbeat.Heartbeat
+	hbStop         chan struct{}
+	pubKey         string
+	signer         ssh.Signer
+	appURL         string
+	started        bool
 }
 
 // NewHub creates a new Hub instance with default configuration
@@ -54,9 +67,33 @@ func NewHub(app core.App) *Hub {
 	hub.rm = records.NewRecordManager(hub)
 	hub.sm = systems.NewSystemManager(hub)
 	hub.monSched = monitors.NewScheduler(app)
+	hub.monSched.SetAlertCallback(func(userID, title, message, link, linkText string) {
+		hub.AlertManager.SendAlert(alerts.AlertMessageData{
+			UserID:   userID,
+			Title:    title,
+			Message:  message,
+			Link:     link,
+			LinkText: linkText,
+		})
+	})
 	hub.monAPI = monitors.NewAPIHandler(app, hub.monSched)
 	hub.domainSched = domains.NewScheduler(app)
+	hub.domainSched.SetAlertCallback(func(userID, title, message, link, linkText string) {
+		hub.AlertManager.SendAlert(alerts.AlertMessageData{
+			UserID:   userID,
+			Title:    title,
+			Message:  message,
+			Link:     link,
+			LinkText: linkText,
+		})
+	})
 	hub.domainAPI = domains.NewAPIHandler(app, hub.domainSched)
+	hub.statusPageAPI = statuspages.NewAPIHandler(app)
+	hub.maintenanceAPI = maintenance.NewAPIHandler(app)
+	hub.bulkAPI = bulk.NewAPIHandler(app)
+	hub.incidentAPI = incidents.NewAPIHandler(app)
+	hub.badgeAPI = badges.NewAPIHandler(app)
+	hub.settingsAPI = settings.NewAPIHandler(app)
 	hub.exportAPI = export.NewAPIHandler(app)
 	hub.hb = heartbeat.New(app, utils.GetEnv)
 	if hub.hb != nil {
@@ -106,34 +143,50 @@ func (h *Hub) StartHub() error {
 		if err := h.startServer(e); err != nil {
 			return err
 		}
-		// start system updates
-		if err := h.sm.Initialize(); err != nil {
-			return err
+		// start system updates and background services only once
+		if !h.started {
+			h.started = true
+			// start system updates
+			if err := h.sm.Initialize(); err != nil {
+				return err
+			}
+			// start heartbeat if configured
+			if h.hb != nil {
+				go h.hb.Start(h.hbStop)
+			}
+			// start monitor scheduler
+			if err := h.monSched.Start(); err != nil {
+				return err
+			}
+			// start domain scheduler
+			h.domainSched.Start()
+			// bind monitor lifecycle hooks
+			h.bindMonitorHooks()
+			// bind domain lifecycle hooks
+			h.bindDomainHooks()
 		}
-		// start heartbeat if configured
-		if h.hb != nil {
-			go h.hb.Start(h.hbStop)
-		}
-		// start monitor scheduler
-		if err := h.monSched.Start(); err != nil {
-			return err
-		}
-		// start domain scheduler
-		h.domainSched.Start()
 		// register monitor API routes
 		h.monAPI.RegisterRoutes(e)
 		// register domain API routes
 		h.domainAPI.RegisterRoutes(e)
+		// register status page API routes
+		h.statusPageAPI.RegisterRoutes(e)
+		// register maintenance API routes
+		h.maintenanceAPI.RegisterRoutes(e)
+		// register bulk API routes
+		h.bulkAPI.RegisterRoutes(e)
+		// register incident API routes
+		h.incidentAPI.RegisterRoutes(e)
+		// register badge API routes
+		h.badgeAPI.RegisterRoutes(e)
+		// register settings API routes
+		h.settingsAPI.RegisterRoutes(e)
 		// register export API routes
 		h.exportAPI.RegisterRoutes(e)
-		// bind monitor lifecycle hooks
-		h.bindMonitorHooks()
-		// bind domain lifecycle hooks
-		h.bindDomainHooks()
 		return e.Next()
 	})
 
-	// TODO: move to users package
+	// NOTE: consider moving user initialization into users package
 	// handle default values for user / user_settings creation
 	h.App.OnRecordCreate("users").BindFunc(h.um.InitializeUserRole)
 	h.App.OnRecordCreate("user_settings").BindFunc(h.um.InitializeUserSettings)
@@ -225,12 +278,14 @@ func (h *Hub) bindDomainHooks() {
 
 // GetSSHKey generates key pair if it doesn't exist and returns signer
 func (h *Hub) GetSSHKey(dataDir string) (ssh.Signer, error) {
-	if h.signer != nil {
-		return h.signer, nil
-	}
-
 	if dataDir == "" {
 		dataDir = h.DataDir()
+	}
+
+	// Only cache the signer when using the default data directory
+	isDefaultDir := dataDir == h.DataDir()
+	if isDefaultDir && h.signer != nil {
+		return h.signer, nil
 	}
 
 	privateKeyPath := path.Join(dataDir, "id_ed25519")
@@ -244,6 +299,9 @@ func (h *Hub) GetSSHKey(dataDir string) (ssh.Signer, error) {
 		}
 		pubKeyBytes := ssh.MarshalAuthorizedKey(private.PublicKey())
 		h.pubKey = strings.TrimSuffix(string(pubKeyBytes), "\n")
+		if isDefaultDir {
+			h.signer = private
+		}
 		return private, nil
 	} else if !os.IsNotExist(err) {
 		// File exists but couldn't be read for some other reason
@@ -268,6 +326,9 @@ func (h *Hub) GetSSHKey(dataDir string) (ssh.Signer, error) {
 	sshPrivate, _ := ssh.NewSignerFromSigner(privKey)
 	pubKeyBytes := ssh.MarshalAuthorizedKey(sshPrivate.PublicKey())
 	h.pubKey = strings.TrimSuffix(string(pubKeyBytes), "\n")
+	if isDefaultDir {
+		h.signer = sshPrivate
+	}
 
 	h.Logger().Info("ed25519 key pair generated successfully.")
 	h.Logger().Info("Saved to: " + privateKeyPath)

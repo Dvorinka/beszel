@@ -1,11 +1,22 @@
-import { memo, useState, useMemo } from "react"
+import { memo, useMemo, useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Trans } from "@lingui/react/macro"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+AlertDialog,
+AlertDialogAction,
+AlertDialogCancel,
+AlertDialogContent,
+AlertDialogDescription,
+AlertDialogFooter,
+AlertDialogHeader,
+AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
 	Globe,
@@ -30,13 +41,27 @@ import {
 	pauseMonitor,
 	resumeMonitor,
 	deleteMonitor,
+	updateMonitor,
 	getMonitorTypeLabel,
 	formatUptime,
 	formatPing,
 } from "@/lib/monitors"
 import { formatDate } from "@/lib/domains"
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, AreaChart, Area } from "recharts"
+import { getStatusPages, createStatusPage } from "@/lib/statuspages"
+import {
+	Bar,
+	XAxis,
+	YAxis,
+	CartesianGrid,
+	Tooltip,
+	ResponsiveContainer,
+	Area,
+	Cell,
+	ComposedChart,
+	Legend,
+} from "recharts"
 import { Link, navigate } from "@/components/router"
+import { AddMonitorDialog } from "@/components/monitors-table/add-monitor-dialog"
 import { cn } from "@/lib/utils"
 
 // Status badge component
@@ -103,22 +128,27 @@ function StatCard({
 export default memo(function MonitorDetail({ id }: { id: string }) {
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
-	const [activeTab, setActiveTab] = useState("overview")
+	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+	const [timeRange, setTimeRange] = useState<"24h" | "7d" | "30d">("24h")
 
 	const { data: monitor, isLoading: isMonitorLoading } = useQuery({
 		queryKey: ["monitor", id],
 		queryFn: () => getMonitor(id),
+		staleTime: Infinity,
 		refetchInterval: 30000,
 	})
 
 	const { data: stats } = useQuery({
 		queryKey: ["monitor-stats", id],
 		queryFn: () => getMonitorStats(id),
+		refetchInterval: 30000,
 	})
 
 	const { data: heartbeatsData } = useQuery({
 		queryKey: ["monitor-heartbeats", id],
 		queryFn: () => getMonitorHeartbeats(id),
+		refetchInterval: 30000,
 	})
 	const heartbeats = heartbeatsData?.heartbeats
 
@@ -152,24 +182,72 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 		},
 	})
 
+	const [isCreateStatusPageOpen, setIsCreateStatusPageOpen] = useState(false)
+	const [statusPageName, setStatusPageName] = useState("")
+	const [statusPageSlug, setStatusPageSlug] = useState("")
+
+	const { data: statusPages } = useQuery({
+		queryKey: ["status-pages"],
+		queryFn: () => getStatusPages(),
+	})
+
+	const updateStatusPagesMutation = useMutation({
+		mutationFn: (status_pages: string[]) => updateMonitor(id, { status_pages } as any),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["monitor", id] })
+			toast({ title: "Status pages updated" })
+		},
+	})
+
+	const createStatusPageMutation = useMutation({
+		mutationFn: () =>
+			createStatusPage({
+				name: statusPageName || `${monitor?.name} Status`,
+				slug: statusPageSlug || monitor?.name?.toLowerCase().replace(/\s+/g, "-") || "status",
+				title: statusPageName || `${monitor?.name} Status Page`,
+				public: true,
+			}),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["status-pages"] })
+			toast({ title: "Status page created" })
+			setIsCreateStatusPageOpen(false)
+			setStatusPageName("")
+			setStatusPageSlug("")
+		},
+	})
+
 	const handleDelete = () => {
-		if (confirm("Are you sure you want to delete this monitor?")) {
-			deleteMutation.mutate()
-		}
+		setIsDeleteDialogOpen(true)
 	}
+
+	// Filter heartbeats by time range
+	const filteredHeartbeats = useMemo(() => {
+		if (!heartbeats) return []
+		const now = Date.now()
+		const ranges: Record<string, number> = {
+			"24h": 24 * 60 * 60 * 1000,
+			"7d": 7 * 24 * 60 * 60 * 1000,
+			"30d": 30 * 24 * 60 * 60 * 1000,
+		}
+		const cutoff = now - (ranges[timeRange] || ranges["24h"])
+		return heartbeats.filter((h: any) => {
+			const t = new Date(h.time || h.timestamp).getTime()
+			return t >= cutoff
+		})
+	}, [heartbeats, timeRange])
 
 	// Prepare chart data from heartbeats
 	const chartData = useMemo(() => {
-		if (!heartbeats) return []
-		return heartbeats
+		if (!filteredHeartbeats.length) return []
+		return filteredHeartbeats
 			.slice()
 			.reverse()
 			.map((h: any) => ({
-				time: new Date(h.timestamp).toLocaleTimeString(),
+				time: new Date(h.time || h.timestamp).toLocaleTimeString(),
 				responseTime: h.ping || 0,
 				status: h.status === "up" ? 1 : 0,
 			}))
-	}, [heartbeats])
+	}, [filteredHeartbeats])
 
 	// Calculate stats
 	const uptimeStats = useMemo(() => {
@@ -278,7 +356,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 									</>
 								)}
 							</Button>
-							<Button variant="outline" size="sm">
+							<Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
 								<Edit3 className="mr-2 h-4 w-4" />
 								<Trans>Edit</Trans>
 							</Button>
@@ -291,230 +369,308 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 				</CardContent>
 			</Card>
 
-			{/* Stats Grid */}
-			<div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			{/* Summary Bar */}
+			<div className="grid sm:grid-cols-4 gap-4">
 				<StatCard
 					title="Uptime (24h)"
 					value={formatUptime(stats?.uptime_24h ? (stats.uptime_24h.up / stats.uptime_24h.total) * 100 : 0)}
 					icon={Activity}
-					trend={stats?.uptime_24h && (stats.uptime_24h.up / stats.uptime_24h.total) * 100 >= 99 ? "up" : "down"}
 				/>
 				<StatCard
 					title="Uptime (7d)"
 					value={formatUptime(stats?.uptime_7d ? (stats.uptime_7d.up / stats.uptime_7d.total) * 100 : 0)}
 					icon={Activity}
-					trend={stats?.uptime_7d && (stats.uptime_7d.up / stats.uptime_7d.total) * 100 >= 99 ? "up" : "down"}
 				/>
 				<StatCard
 					title="Uptime (30d)"
 					value={formatUptime(stats?.uptime_30d ? (stats.uptime_30d.up / stats.uptime_30d.total) * 100 : 0)}
 					icon={Activity}
-					trend={stats?.uptime_30d && (stats.uptime_30d.up / stats.uptime_30d.total) * 100 >= 99 ? "up" : "down"}
 				/>
 				<StatCard
-					title="Response Time"
+					title="Avg Response"
 					value={uptimeStats ? `${uptimeStats.avgResponse}ms` : "-"}
 					subtitle={`${uptimeStats?.totalChecks || 0} checks`}
 					icon={Clock}
 				/>
 			</div>
 
-			{/* Tabs */}
-			<Tabs value={activeTab} onValueChange={setActiveTab} className="contents">
-				<TabsList className="h-11 p-1.5 w-full shadow-xs overflow-auto justify-start">
-					<TabsTrigger value="overview" className="w-full flex items-center gap-1.5">
-						<Activity className="size-3.5" />
-						<Trans>Overview</Trans>
-					</TabsTrigger>
-					<TabsTrigger value="response" className="w-full flex items-center gap-1.5">
-						<TrendingUp className="size-3.5" />
-						<Trans>Response Times</Trans>
-					</TabsTrigger>
-					<TabsTrigger value="history" className="w-full flex items-center gap-1.5">
-						<Clock className="size-3.5" />
-						<Trans>Check History</Trans>
-					</TabsTrigger>
-				</TabsList>
-
-				<TabsContent value="overview" className="contents">
-					<div className="grid gap-4">
-						{/* Response Time Chart */}
-						<Card>
-							<CardHeader>
-								<CardTitle>Response Time History</CardTitle>
-								<CardDescription>Response times for the last 50 checks</CardDescription>
-							</CardHeader>
-							<CardContent>
-								<div className="h-[300px]">
-									<ResponsiveContainer width="100%" height="100%">
-										<LineChart data={chartData}>
-											<defs>
-												<linearGradient id="colorResponse" x1="0" y1="0" x2="0" y2="1">
-													<stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-													<stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-												</linearGradient>
-											</defs>
-											<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-											<XAxis dataKey="time" tick={{ fontSize: 12 }} />
-											<YAxis tick={{ fontSize: 12 }} unit="ms" />
-											<Tooltip
-												contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-											/>
-											<Area
-												type="monotone"
-												dataKey="responseTime"
-												stroke="#3b82f6"
-												fillOpacity={1}
-												fill="url(#colorResponse)"
-												name="Response Time (ms)"
-											/>
-										</LineChart>
-									</ResponsiveContainer>
-								</div>
-							</CardContent>
-						</Card>
-
-						{/* Monitor Details */}
-						<div className="grid sm:grid-cols-2 gap-4">
-							<Card>
-								<CardHeader>
-									<CardTitle>Monitor Details</CardTitle>
-								</CardHeader>
-								<CardContent className="space-y-2">
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">Type</span>
-										<span className="font-medium">{getMonitorTypeLabel(monitor.type)}</span>
-									</div>
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">Interval</span>
-										<span className="font-medium">{monitor.interval}s</span>
-									</div>
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">Retries</span>
-										<span className="font-medium">{monitor.retries}</span>
-									</div>
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">Created</span>
-										<span className="font-medium">{formatDate(monitor.created)}</span>
-									</div>
-									{monitor.last_check && (
-										<div className="flex justify-between">
-											<span className="text-muted-foreground">Last Check</span>
-											<span className="font-medium">{formatDate(monitor.last_check)}</span>
-										</div>
-									)}
-								</CardContent>
-							</Card>
-
-							<Card>
-								<CardHeader>
-									<CardTitle>Uptime Statistics</CardTitle>
-								</CardHeader>
-								<CardContent className="space-y-2">
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">24 Hours</span>
-										<span className="font-medium text-green-600">{formatUptime(stats?.uptime_24h ? (stats.uptime_24h.up / stats.uptime_24h.total) * 100 : 0)}</span>
-									</div>
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">7 Days</span>
-										<span className="font-medium text-green-600">{formatUptime(stats?.uptime_7d ? (stats.uptime_7d.up / stats.uptime_7d.total) * 100 : 0)}</span>
-									</div>
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">30 Days</span>
-										<span className="font-medium text-green-600">{formatUptime(stats?.uptime_30d ? (stats.uptime_30d.up / stats.uptime_30d.total) * 100 : 0)}</span>
-									</div>
-									{uptimeStats && (
-										<div className="flex justify-between">
-											<span className="text-muted-foreground">Total Checks</span>
-											<span className="font-medium">{uptimeStats.totalChecks}</span>
-										</div>
-									)}
-								</CardContent>
-							</Card>
-						</div>
+			{/* Combined Uptime & Response Chart */}
+			<Card>
+				<CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div>
+						<CardTitle>Uptime & Response Time</CardTitle>
+						<CardDescription>
+							<Trans>Status and response time over the selected period</Trans>
+						</CardDescription>
 					</div>
-				</TabsContent>
-
-				<TabsContent value="response" className="contents">
-					<Card>
-						<CardHeader>
-							<CardTitle>Response Time Analysis</CardTitle>
-							<CardDescription>Detailed response time metrics</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<div className="h-[400px]">
-								<ResponsiveContainer width="100%" height="100%">
-									<AreaChart data={chartData}>
-										<defs>
-											<linearGradient id="colorResponseDetail" x1="0" y1="0" x2="0" y2="1">
-												<stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-												<stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-											</linearGradient>
-										</defs>
-										<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-										<XAxis dataKey="time" tick={{ fontSize: 12 }} />
-										<YAxis tick={{ fontSize: 12 }} unit="ms" />
-										<Tooltip
-											contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-										/>
-										<Area
-											type="monotone"
-											dataKey="responseTime"
-											stroke="#8b5cf6"
-											strokeWidth={2}
-											fillOpacity={1}
-											fill="url(#colorResponseDetail)"
-											name="Response Time (ms)"
-										/>
-									</AreaChart>
-								</ResponsiveContainer>
+					<div className="flex items-center gap-2">
+						{(["24h", "7d", "30d"] as const).map((range) => (
+							<Button
+								key={range}
+								variant={timeRange === range ? "default" : "outline"}
+								size="sm"
+								onClick={() => setTimeRange(range)}
+							>
+								{range === "24h" ? "24h" : range === "7d" ? "7d" : "30d"}
+							</Button>
+						))}
+					</div>
+				</CardHeader>
+				<CardContent>
+					<div className="h-[300px]">
+						{chartData.length > 0 ? (
+							<ResponsiveContainer width="100%" height="100%">
+								<ComposedChart data={chartData}>
+									<defs>
+										<linearGradient id="colorResponse" x1="0" y1="0" x2="0" y2="1">
+											<stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+											<stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+										</linearGradient>
+									</defs>
+									<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+									<XAxis dataKey="time" tick={{ fontSize: 12 }} />
+									<YAxis
+										yAxisId="left"
+										tick={{ fontSize: 12 }}
+										unit="ms"
+									/>
+									<YAxis
+										yAxisId="right"
+										orientation="right"
+										tick={{ fontSize: 12 }}
+										domain={[0, 1]}
+										tickFormatter={(v) => (v === 1 ? "Up" : "Down")}
+									/>
+									<Tooltip
+										contentStyle={{
+											backgroundColor: "hsl(var(--card))",
+											border: "1px solid hsl(var(--border))",
+										}}
+									/>
+									<Legend />
+									<Area
+										yAxisId="left"
+										type="monotone"
+										dataKey="responseTime"
+										stroke="#3b82f6"
+										fillOpacity={1}
+										fill="url(#colorResponse)"
+										name="Response Time (ms)"
+									/>
+									<Bar
+										yAxisId="right"
+										dataKey="status"
+										barSize={4}
+										name="Status"
+									>
+										{chartData.map((entry, index) => (
+											<Cell
+												key={`cell-${index}`}
+												fill={entry.status === 1 ? "#22c55e" : "#ef4444"}
+											/>
+										))}
+									</Bar>
+								</ComposedChart>
+							</ResponsiveContainer>
+						) : (
+							<div className="h-full flex items-center justify-center text-muted-foreground">
+								<Trans>No data available for selected time range</Trans>
 							</div>
-						</CardContent>
-					</Card>
-				</TabsContent>
+						)}
+					</div>
+				</CardContent>
+			</Card>
 
-				<TabsContent value="history" className="contents">
-					<Card>
-						<CardHeader>
-							<CardTitle>Recent Checks</CardTitle>
-							<CardDescription>Last 50 monitor checks</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Time</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Response Time</TableHead>
-										<TableHead>Message</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{heartbeats?.slice(0, 50).map((hb: any) => (
-										<TableRow key={hb.id}>
-											<TableCell>{formatDate(hb.timestamp)}</TableCell>
-											<TableCell>
-												<Badge variant={hb.status === "up" ? "default" : "destructive"}>
-													{hb.status}
-												</Badge>
-											</TableCell>
-											<TableCell>{formatPing(hb.ping)}</TableCell>
-											<TableCell className="max-w-xs truncate">{hb.message || "-"}</TableCell>
-										</TableRow>
-									))}
-									{!heartbeats?.length && (
-										<TableRow>
-											<TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-												No check history available
-											</TableCell>
-										</TableRow>
-									)}
-								</TableBody>
-							</Table>
-						</CardContent>
-					</Card>
-				</TabsContent>
-			</Tabs>
+			<div className="grid sm:grid-cols-2 gap-4">
+				<Card>
+					<CardHeader>
+						<CardTitle>Monitor Details</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-2">
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Type</span>
+							<span className="font-medium">{getMonitorTypeLabel(monitor.type)}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Interval</span>
+							<span className="font-medium">{monitor.interval}s</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Retries</span>
+							<span className="font-medium">{monitor.retries}</span>
+						</div>
+						<div className="flex justify-between">
+							<span className="text-muted-foreground">Created</span>
+							<span className="font-medium">{formatDate(monitor.created)}</span>
+						</div>
+						{monitor.last_check && (
+							<div className="flex justify-between">
+								<span className="text-muted-foreground">Last Check</span>
+								<span className="font-medium">{formatDate(monitor.last_check)}</span>
+							</div>
+						)}
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Status Page</CardTitle>
+						<CardDescription>Link or create a public status page</CardDescription>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						{statusPages && statusPages.length > 0 ? (
+							<div className="space-y-2">
+								{statusPages.map((page) => {
+									const isLinked = monitor.status_pages?.includes(page.id) || false
+									return (
+										<div key={page.id} className="flex items-center justify-between py-1">
+											<span className="text-sm">{page.name}</span>
+											<Button
+												variant={isLinked ? "default" : "outline"}
+												size="sm"
+												onClick={() => {
+													const current = monitor.status_pages || []
+													const next = isLinked
+															? current.filter((sp) => sp !== page.id)
+															: [...current, page.id]
+													updateStatusPagesMutation.mutate({
+														id: monitor.id,
+														status_pages: next,
+													} as any)
+												}}
+											>
+												{isLinked ? "Linked" : "Link"}
+											</Button>
+										</div>
+									)
+									})}
+								</div>
+							) : (
+								<p className="text-sm text-muted-foreground">No status pages yet.</p>
+							)}
+						<Button
+							variant="outline"
+							size="sm"
+							className="w-full"
+							onClick={() => setIsCreateStatusPageOpen(true)}
+						>
+							Create Status Page
+						</Button>
+					</CardContent>
+				</Card>
+			</div>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>Recent Checks</CardTitle>
+					<CardDescription>Last 50 monitor checks</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Time</TableHead>
+								<TableHead>Status</TableHead>
+								<TableHead>Response Time</TableHead>
+								<TableHead>Message</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{heartbeats?.slice(0, 50).map((hb: any) => (
+								<TableRow key={hb.id}>
+									<TableCell>{formatDate(hb.time || hb.timestamp)}</TableCell>
+									<TableCell>
+										<Badge variant={hb.status === "up" ? "default" : "destructive"}>
+											{hb.status}
+										</Badge>
+									</TableCell>
+									<TableCell>{formatPing(hb.ping)}</TableCell>
+									<TableCell className="max-w-xs truncate">{hb.msg || "-"}</TableCell>
+								</TableRow>
+							))}
+							{!heartbeats?.length && (
+								<TableRow>
+									<TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+										No check history available
+									</TableCell>
+								</TableRow>
+							)}
+						</TableBody>
+					</Table>
+				</CardContent>
+			</Card>
+
+			{/* Create Status Page Dialog */}
+			{isCreateStatusPageOpen && (
+				<AlertDialog open={isCreateStatusPageOpen} onOpenChange={setIsCreateStatusPageOpen}>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Create Status Page</AlertDialogTitle>
+							<AlertDialogDescription>
+								Create a public status page for this monitor.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<div className="grid gap-4 py-4">
+							<div className="grid gap-2">
+								<Label htmlFor="sp-name">Name</Label>
+								<Input
+									id="sp-name"
+									value={statusPageName}
+									onChange={(e) => setStatusPageName(e.target.value)}
+									placeholder={`${monitor.name} Status`}
+								/>
+							</div>
+							<div className="grid gap-2">
+								<Label htmlFor="sp-slug">Slug</Label>
+								<Input
+									id="sp-slug"
+									value={statusPageSlug}
+									onChange={(e) => setStatusPageSlug(e.target.value)}
+									placeholder={monitor.name?.toLowerCase().replace(/\s+/g, "-")}
+								/>
+							</div>
+						</div>
+						<AlertDialogFooter>
+							<AlertDialogCancel onClick={() => setIsCreateStatusPageOpen(false)}>Cancel</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={() => createStatusPageMutation.mutate()}
+								disabled={createStatusPageMutation.isPending}
+							>
+								Create
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			)}
+			<AddMonitorDialog
+				open={isEditDialogOpen}
+				onOpenChange={setIsEditDialogOpen}
+				monitor={monitor}
+				isEdit
+			/>
+
+			<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete Monitor</AlertDialogTitle>
+						<AlertDialogDescription>
+							Are you sure you want to delete this monitor? This action cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => {
+								deleteMutation.mutate()
+								setIsDeleteDialogOpen(false)
+							}}
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	)
 })

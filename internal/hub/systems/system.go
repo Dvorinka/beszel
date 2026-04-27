@@ -49,6 +49,7 @@ type System struct {
 	detailsFetched atomic.Bool             // True if static system details have been fetched and saved
 	smartFetching  atomic.Bool             // True if SMART devices are currently being fetched
 	smartInterval  time.Duration           // Interval for periodic SMART data updates
+	done           chan struct{}           // Closed when StartUpdater goroutine exits
 }
 
 func (sm *SystemManager) NewSystem(systemId string) *System {
@@ -79,14 +80,20 @@ func (sys *System) StartUpdater() {
 	} else {
 		// if the system does not have a websocket connection, wait before updating
 		// to allow the agent to connect via websocket (makes sure fingerprint is set).
-		time.Sleep(11 * time.Second)
+		select {
+		case <-time.After(11 * time.Second):
+		case <-sys.ctx.Done():
+			return
+		}
 	}
 
 	// update immediately if system is not paused (only for ws connections)
 	// we'll wait a minute before connecting via SSH to prioritize ws connections
 	if sys.Status != paused && sys.ctx.Err() == nil {
 		if err := sys.update(); err != nil {
-			_ = sys.setDown(err)
+			if sys.ctx.Err() == nil {
+				_ = sys.setDown(err)
+			}
 		}
 	}
 
@@ -100,16 +107,23 @@ func (sys *System) StartUpdater() {
 			return
 		case <-sys.updateTicker.C:
 			if err := sys.update(); err != nil {
-				_ = sys.setDown(err)
+				if sys.ctx.Err() == nil {
+					_ = sys.setDown(err)
+				}
 			}
 		case <-downChan:
+			if sys.ctx.Err() != nil {
+				return
+			}
 			sys.WsConn = nil
 			downChan = nil
 			_ = sys.setDown(nil)
 		case <-jitter:
 			sys.updateTicker.Reset(time.Duration(interval) * time.Millisecond)
 			if err := sys.update(); err != nil {
-				_ = sys.setDown(err)
+				if sys.ctx.Err() == nil {
+					_ = sys.setDown(err)
+				}
 			}
 		}
 	}
@@ -173,12 +187,12 @@ func (sys *System) update() error {
 func (sys *System) handlePaused() {
 	if sys.WsConn == nil {
 		// if the system is paused and there's no websocket connection, remove the system
-		_ = sys.manager.RemoveSystem(sys.Id)
+		_ = sys.manager.removeSystem(sys.Id, false)
 	} else {
 		// Send a ping to the agent to keep the connection alive if the system is paused
 		if err := sys.WsConn.Ping(); err != nil {
 			sys.manager.hub.Logger().Warn("Failed to ping agent", "system", sys.Id, "err", err)
-			_ = sys.manager.RemoveSystem(sys.Id)
+			_ = sys.manager.removeSystem(sys.Id, false)
 		}
 	}
 }
@@ -344,10 +358,23 @@ func createContainerRecords(app core.App, data []*container.Stats, systemId stri
 
 // getRecord retrieves the system record from the database.
 // If the record is not found, it removes the system from the manager.
-func (sys *System) getRecord(app core.App) (*core.Record, error) {
-	record, err := app.FindRecordById("systems", sys.Id)
+func (sys *System) getRecord(app core.App) (record *core.Record, err error) {
+	if sys.ctx != nil && sys.ctx.Err() != nil {
+		return nil, sys.ctx.Err()
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			// PocketBase internals can panic during test teardown after DB cleanup.
+			// Treat this the same as a canceled updater so callers exit quietly.
+			record = nil
+			err = fmt.Errorf("system record unavailable during shutdown: %v", recovered)
+		}
+	}()
+	record, err = app.FindRecordById("systems", sys.Id)
 	if err != nil || record == nil {
-		_ = sys.manager.RemoveSystem(sys.Id)
+		if sys.ctx == nil || sys.ctx.Err() == nil {
+			_ = sys.manager.removeSystem(sys.Id, false)
+		}
 		return nil, err
 	}
 	return record, nil
@@ -378,7 +405,7 @@ func (sys *System) HasUser(app core.App, user *core.Record) bool {
 // It takes the original error that caused the system to go down and returns any error
 // encountered during the process of updating the system status.
 func (sys *System) setDown(originalError error) error {
-	if sys.Status == down || sys.Status == paused {
+	if sys.Status == down || sys.Status == paused || (sys.ctx != nil && sys.ctx.Err() != nil) {
 		return nil
 	}
 	record, err := sys.getRecord(sys.manager.hub)

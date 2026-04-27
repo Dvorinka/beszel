@@ -525,9 +525,11 @@ func (h *APIHandler) getHeartbeats(e *core.RequestEvent) error {
 		"monitor_heartbeats",
 		"monitor = {:monitorId}",
 		"-time",
-		0,
 		limit,
-		map[string]any{"monitorId": id},
+		0,
+		map[string]any{
+			"monitorId": id,
+		},
 	)
 	if err != nil {
 		return e.InternalServerError("Failed to fetch heartbeats", err)

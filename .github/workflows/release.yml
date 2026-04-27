@@ -11,9 +11,10 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -21,15 +22,16 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --no-save --cwd ./internal/site
+        run: bun install --frozen-lockfile --cwd ./internal/site
 
       - name: Build site
         run: bun run --cwd ./internal/site build
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: "^1.22.1"
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4

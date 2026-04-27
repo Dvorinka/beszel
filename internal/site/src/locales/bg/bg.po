@@ -117,6 +117,11 @@ msgstr ""
 msgid "Active"
 msgstr "Активен"
 
+#. placeholder {0}: statusCounts.active
+#: src/components/domains-table/domains-table.tsx
+msgid "Active ({0})"
+msgstr ""
+
 #: src/components/active-alerts.tsx
 msgid "Active Alerts"
 msgstr "Активни тревоги"
@@ -126,20 +131,27 @@ msgid "Active state"
 msgstr "Активно състояние"
 
 #: src/components/monitors-table/monitors-table.tsx
-msgid "Add"
-msgstr ""
+#~ msgid "Add"
+#~ msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/add-system.tsx
-#: src/components/navbar.tsx
-#: src/components/navbar.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Add {foo}"
 msgstr "Добави {foo}"
 
+#: src/components/domains-table/domains-table.tsx
+msgid "Add Domain"
+msgstr ""
+
 #: src/components/monitors-table/add-monitor-dialog.tsx
+#: src/components/monitors-table/monitors-table.tsx
 msgid "Add Monitor"
+msgstr ""
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Add System"
 msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
@@ -191,6 +203,15 @@ msgstr "История на нотификациите"
 msgid "Alerts"
 msgstr "Тревоги"
 
+#. placeholder {0}: data.length
+#. placeholder {0}: stats.total
+#. placeholder {0}: statusCounts.total
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
+#: src/components/systems-table/systems-table.tsx
+msgid "All ({0})"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/containers-table/containers-table.tsx
 #: src/components/navbar.tsx
@@ -203,13 +224,16 @@ msgstr "Всички контейнери"
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table.tsx
-#: src/components/systems-table/systems-table.tsx
 msgid "All Systems"
 msgstr "Всички системи"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
 msgstr "Сигурен ли си, че искаш да изтриеш {name}?"
+
+#: src/components/domains-table/domains-table.tsx
+msgid "Are you sure you want to delete this domain? This action cannot be undone."
+msgstr ""
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Are you sure?"
@@ -340,6 +364,12 @@ msgstr "Байта (KB/s, MB/s, GB/s)"
 msgid "Cache / Buffers"
 msgstr "Кеш / Буфери"
 
+#: src/components/command-palette.tsx
+#: src/components/routes/calendar.tsx
+#: src/components/routes/home.tsx
+msgid "Calendar"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Can reload"
 msgstr "Може да се презареди"
@@ -352,6 +382,7 @@ msgstr "Може да се стартира"
 msgid "Can stop"
 msgstr "Може да се спре"
 
+#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/add-monitor-dialog.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -376,8 +407,8 @@ msgid "Celsius (°C)"
 msgstr "Целзий (°C)"
 
 #: src/components/monitors-table/add-monitor-dialog.tsx
-msgid "Certificate expiry notifications are only available for HTTPS monitors."
-msgstr ""
+#~ msgid "Certificate expiry notifications are only available for HTTPS monitors."
+#~ msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Change display units for metrics."
@@ -409,8 +440,8 @@ msgid "Check {email} for a reset link."
 msgstr "Провери {email} за линк за нулиране."
 
 #: src/components/routes/monitor.tsx
-msgid "Check History"
-msgstr ""
+#~ msgid "Check History"
+#~ msgstr ""
 
 #: src/components/routes/settings/layout.tsx
 msgid "Check logs for more details."
@@ -449,6 +480,10 @@ msgstr "Кликнете върху система, за да видите по�
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
 msgstr "Настисни за да копираш"
+
+#: src/components/systems-table/systems-table.tsx
+msgid "Columns"
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -627,8 +662,16 @@ msgid "data.status"
 msgstr ""
 
 #: src/components/monitors-table/add-monitor-dialog.tsx
-msgid "Days before expiry to notify"
+msgid "Database Connection"
 msgstr ""
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "Database Name"
+msgstr ""
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+#~ msgid "Days before expiry to notify"
+#~ msgstr ""
 
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Default system layout option"
@@ -639,6 +682,7 @@ msgstr "Подредба"
 msgid "Default time period"
 msgstr "Времеви диапазон по подразбиране"
 
+#: src/components/domains-table/domains-table.tsx
 #: src/components/routes/domain.tsx
 #: src/components/routes/monitor.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -647,6 +691,10 @@ msgstr "Времеви диапазон по подразбиране"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Delete"
 msgstr "Изтрий"
+
+#: src/components/domains-table/domains-table.tsx
+msgid "Delete Domain"
+msgstr ""
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Delete fingerprint"
@@ -699,8 +747,8 @@ msgid "Display"
 msgstr "Показване"
 
 #: src/components/routes/domain.tsx
-msgid "DNS Records"
-msgstr ""
+#~ msgid "DNS Records"
+#~ msgstr ""
 
 #: src/components/monitors-table/add-monitor-dialog.tsx
 msgid "DNS Server (optional)"
@@ -723,6 +771,18 @@ msgstr "Мрежов I/O използван от docker"
 msgid "Documentation"
 msgstr "Документация"
 
+#: src/components/routes/home.tsx
+msgid "Domain and SSL expiry calendar"
+msgstr ""
+
+#: src/components/domains-table/domains-table.tsx
+msgid "Domain Monitoring"
+msgstr ""
+
+#: src/components/command-palette.tsx
+msgid "Domains"
+msgstr ""
+
 #. Context: System is down
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/info-bar.tsx
@@ -730,6 +790,11 @@ msgstr "Документация"
 #: src/lib/alerts.ts
 msgid "Down"
 msgstr "Офлайн"
+
+#. placeholder {0}: stats.down
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Down ({0})"
+msgstr ""
 
 #: src/components/systems-table/systems-table.tsx
 msgid "Down ({downSystemsLength})"
@@ -851,9 +916,19 @@ msgstr "Излезе активно"
 msgid "Expected Value"
 msgstr ""
 
+#. placeholder {0}: statusCounts.expired
+#: src/components/domains-table/domains-table.tsx
+msgid "Expired ({0})"
+msgstr ""
+
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Expires after one hour or on hub restart."
 msgstr "Изтича след един час или при рестартиране на хъба."
+
+#. placeholder {0}: statusCounts.expiring
+#: src/components/domains-table/domains-table.tsx
+msgid "Expiring ({0})"
+msgstr ""
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "Export"
@@ -914,6 +989,14 @@ msgstr ""
 msgid "Failed: {0}"
 msgstr "Неуспешни: {0}"
 
+#: src/components/domains-table/domains-table.tsx
+msgid "Filter domains..."
+msgstr ""
+
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Filter monitors..."
+msgstr ""
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/system/chart-card.tsx
@@ -958,8 +1041,8 @@ msgid "General"
 msgstr "Общо"
 
 #: src/components/monitors-table/add-monitor-dialog.tsx
-msgid "General notification settings will be configured in the Notifications tab."
-msgstr ""
+#~ msgid "General notification settings will be configured in the Notifications tab."
+#~ msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
@@ -981,13 +1064,23 @@ msgstr "Консумация на ток от графична карта"
 msgid "GPU Usage"
 msgstr "Употреба на GPU"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/routes/system/info-bar.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "Grid"
 msgstr "Мрежово"
 
 #: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "gRPC Keyword"
+msgstr ""
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
 msgid "Headers (JSON)"
+msgstr ""
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "health"
 msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
@@ -1007,14 +1100,18 @@ msgid "Heartbeat sent successfully"
 msgstr "Heartbeat е изпратен успешно"
 
 #: src/components/routes/domain.tsx
-msgid "History"
-msgstr ""
+#~ msgid "History"
+#~ msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Button to copy install command"
 msgid "Homebrew command"
 msgstr "Команда Homebrew"
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "Host / Connection String"
+msgstr ""
 
 #: src/components/add-system.tsx
 msgid "Host / IP"
@@ -1074,6 +1171,13 @@ msgstr "Образ"
 msgid "Inactive"
 msgstr "Неактивен"
 
+#: src/components/command-palette.tsx
+#: src/components/routes/home.tsx
+#: src/components/routes/incidents.tsx
+#: src/components/routes/incidents.tsx
+msgid "Incidents"
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Interval"
 msgstr "Интервал"
@@ -1103,6 +1207,8 @@ msgstr ""
 msgid "Language"
 msgstr "Език"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr "Подреждане"
@@ -1150,6 +1256,10 @@ msgstr "Състояние на зареждане"
 msgid "Loading..."
 msgstr "Зареждане..."
 
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "localhost:3306"
+msgstr ""
+
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
 msgid "Log Out"
@@ -1178,9 +1288,18 @@ msgstr "Търсиш къде да създадеш тревоги? Натисн
 msgid "Main PID"
 msgstr "Главен PID"
 
+#. placeholder {0}: stats.maintenance
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Maintenance ({0})"
+msgstr ""
+
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "Управление на предпочитанията за показване и уведомяване."
+
+#: src/components/routes/home.tsx
+msgid "Manage public status pages"
+msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1243,6 +1362,24 @@ msgstr ""
 msgid "Monitor websites, APIs, and services"
 msgstr ""
 
+#: src/components/command-palette.tsx
+#: src/components/navbar.tsx
+#: src/components/navbar.tsx
+msgid "Monitoring"
+msgstr ""
+
+#: src/components/command-palette.tsx
+msgid "Monitors"
+msgstr ""
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "MQTT Topic"
+msgstr ""
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "mydb"
+msgstr ""
+
 #: src/components/add-system.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/containers-table/containers-table-columns.tsx
@@ -1283,13 +1420,21 @@ msgstr "Единица за измерване на скорост"
 msgid "No"
 msgstr "Не"
 
+#: src/components/routes/monitor.tsx
+msgid "No data available for selected time range"
+msgstr ""
+
 #: src/components/monitors-table/monitors-table.tsx
 msgid "No monitors configured yet."
 msgstr ""
 
 #: src/components/monitors-table/monitors-table.tsx
-msgid "No monitors match your search."
+msgid "No monitors match your filters."
 msgstr ""
+
+#: src/components/monitors-table/monitors-table.tsx
+#~ msgid "No monitors match your search."
+#~ msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1322,8 +1467,8 @@ msgid "Notifications"
 msgstr "Нотификации"
 
 #: src/components/monitors-table/add-monitor-dialog.tsx
-msgid "Notify when certificate expires"
-msgstr ""
+#~ msgid "Notify when certificate expires"
+#~ msgstr ""
 
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
@@ -1364,13 +1509,17 @@ msgstr "Други"
 
 #: src/components/routes/domain.tsx
 #: src/components/routes/monitor.tsx
-msgid "Overview"
-msgstr ""
+#~ msgid "Overview"
+#~ msgstr ""
 
 #: src/components/alerts/alerts-sheet.tsx
 msgid "Overwrite existing alerts"
 msgstr "Презапиши съществуващи тревоги"
 
+#: src/components/command-palette.tsx
+#: src/components/command-palette.tsx
+#: src/components/command-palette.tsx
+#: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1387,8 +1536,13 @@ msgstr "Страница {0} от {1}"
 msgid "Pages / Settings"
 msgstr "Страници / Настройки"
 
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "password"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 #: src/components/login/auth-form.tsx
+#: src/components/monitors-table/add-monitor-dialog.tsx
 msgid "Password"
 msgstr "Парола"
 
@@ -1417,6 +1571,11 @@ msgstr "Пауза"
 msgid "Paused"
 msgstr "На пауза"
 
+#. placeholder {0}: stats.paused
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Paused ({0})"
+msgstr ""
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Paused ({pausedSystemsLength})"
 msgstr "На пауза ({pausedSystemsLength})"
@@ -1424,6 +1583,11 @@ msgstr "На пауза ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Формат на полезния товар"
+
+#. placeholder {0}: stats.pending
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Pending ({0})"
+msgstr ""
 
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1583,8 +1747,8 @@ msgid "Response"
 msgstr ""
 
 #: src/components/routes/monitor.tsx
-msgid "Response Times"
-msgstr ""
+#~ msgid "Response Times"
+#~ msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Restarts"
@@ -1597,6 +1761,10 @@ msgstr "Възобнови"
 
 #: src/components/monitors-table/add-monitor-dialog.tsx
 msgid "Retries"
+msgstr ""
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "root"
 msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
@@ -1662,12 +1830,16 @@ msgid "Search"
 msgstr "Търси"
 
 #: src/components/command-palette.tsx
-msgid "Search for systems or settings..."
-msgstr "Търси за системи или настройки..."
+#~ msgid "Search for systems or settings..."
+#~ msgstr "Търси за системи или настройки..."
+
+#: src/components/command-palette.tsx
+msgid "Search for systems, monitors, domains or settings..."
+msgstr ""
 
 #: src/components/monitors-table/monitors-table.tsx
-msgid "Search monitors..."
-msgstr ""
+#~ msgid "Search monitors..."
+#~ msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Seconds between pings (default: 60)"
@@ -1692,6 +1864,10 @@ msgstr "Изпращайте периодични изходящи пингов�
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "Изпращане на тестов heartbeat"
+
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "sensor/temperature"
+msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Sent"
@@ -1741,8 +1917,12 @@ msgid "SMTP settings"
 msgstr "Настройки за SMTP"
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Sort By"
-msgstr "Сортиране по"
+#~ msgid "Sort By"
+#~ msgstr "Сортиране по"
+
+#: src/components/routes/domain.tsx
+#~ msgid "SSL Certificate"
+#~ msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -1757,6 +1937,8 @@ msgid "State"
 msgstr "Състояние"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1764,6 +1946,16 @@ msgstr "Състояние"
 #: src/lib/alerts.ts
 msgid "Status"
 msgstr "Статус"
+
+#: src/components/routes/monitor.tsx
+msgid "Status and response time over the selected period"
+msgstr ""
+
+#: src/components/command-palette.tsx
+#: src/components/routes/home.tsx
+#: src/components/routes/status-pages.tsx
+msgid "Status Pages"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table-columns.tsx
 msgid "Sub State"
@@ -1789,7 +1981,6 @@ msgstr ""
 #: src/components/add-system.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/containers-table/containers-table-columns.tsx
-#: src/components/navbar.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -1817,6 +2008,8 @@ msgstr "Системи"
 msgid "Systems may be managed in a <0>config.yml</0> file inside your data directory."
 msgstr "Системите могат да бъдат управлявани в <0>config.yml</0> файл намиращ се в директорията с данни."
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "Table"
 msgstr "Таблица"
@@ -1944,6 +2137,10 @@ msgstr ""
 msgid "Total: {0}"
 msgstr "Общо: {0}"
 
+#: src/components/domains-table/domains-table.tsx
+msgid "Track domain expiry dates and watch domains for purchase"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggered by"
 msgstr "Активиран от"
@@ -2022,6 +2219,11 @@ msgstr "Универсален тоукън"
 msgid "Unknown"
 msgstr "Неизвестна"
 
+#. placeholder {0}: statusCounts.unknown
+#: src/components/domains-table/domains-table.tsx
+msgid "Unknown ({0})"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unlimited"
@@ -2032,6 +2234,11 @@ msgstr "Неограничено"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Up"
 msgstr "Нагоре"
+
+#. placeholder {0}: stats.up
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Up ({0})"
+msgstr ""
 
 #: src/components/systems-table/systems-table.tsx
 msgid "Up ({upSystemsLength})"
@@ -2089,6 +2296,10 @@ msgstr "Употреба на root partition-а"
 msgid "Used"
 msgstr "Използвани"
 
+#: src/components/monitors-table/add-monitor-dialog.tsx
+msgid "Username"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Users"
@@ -2103,9 +2314,15 @@ msgstr "Натоварване"
 msgid "Value"
 msgstr "Стойност"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "View"
 msgstr "Изглед"
+
+#: src/components/routes/home.tsx
+msgid "View and manage incidents"
+msgstr ""
 
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/disk-io-sheet.tsx
@@ -2118,8 +2335,8 @@ msgid "View your 200 most recent alerts."
 msgstr "Прегледайте последните си 200 сигнала."
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Visible Fields"
-msgstr "Видими полета"
+#~ msgid "Visible Fields"
+#~ msgstr "Видими полета"
 
 #: src/components/routes/domain.tsx
 #: src/components/routes/monitor.tsx
@@ -2161,6 +2378,10 @@ msgstr "Когато е активиран, този токен позволяв
 #: src/components/routes/settings/heartbeat.tsx
 msgid "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
 msgstr "При използване на POST, всеки heartbeat включва JSON полезен товар с резюме на състоянието на системата, списък на спрените системи и задействаните предупреждения."
+
+#: src/components/routes/domain.tsx
+#~ msgid "WHOIS Info"
+#~ msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx

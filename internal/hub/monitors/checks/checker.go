@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/henrygd/beszel/internal/entities/monitor"
 )
 
@@ -25,6 +26,113 @@ type Checker interface {
 // CheckerRegistry holds all monitor type checkers
 type CheckerRegistry struct {
 	checkers map[string]Checker
+}
+
+// StubChecker returns a placeholder result for monitor types without full implementation
+type StubChecker struct {
+	Name string
+}
+
+func (s *StubChecker) Check(ctx context.Context, m *monitor.Monitor) *monitor.CheckResult {
+	return &monitor.CheckResult{
+		Status: monitor.StatusUp,
+		Ping:   0,
+		Msg:    fmt.Sprintf("%s monitoring is not fully implemented yet", s.Name),
+	}
+}
+
+// PortChecker checks TCP connectivity to a specific service port
+type PortChecker struct {
+	Name        string
+	DefaultPort int
+}
+
+func (c *PortChecker) Check(ctx context.Context, m *monitor.Monitor) *monitor.CheckResult {
+	host := m.Hostname
+	if host == "" {
+		host = m.URL
+	}
+	if host == "" {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: "hostname or URL is required"}
+	}
+	port := m.Port
+	if port == 0 {
+		port = c.DefaultPort
+	}
+	addr := fmt.Sprintf("%s:%d", host, port)
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", addr, time.Duration(m.Timeout)*time.Second)
+	if err != nil {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: err.Error()}
+	}
+	defer conn.Close()
+	ping := int(time.Since(start).Milliseconds())
+	return &monitor.CheckResult{Status: monitor.StatusUp, Ping: ping, Msg: fmt.Sprintf("%s port %d reachable", c.Name, port)}
+}
+
+// MySQLChecker checks MySQL/MariaDB connectivity via TCP
+type MySQLChecker struct{}
+
+func (c *MySQLChecker) Check(ctx context.Context, m *monitor.Monitor) *monitor.CheckResult {
+	host := m.Hostname
+	if host == "" {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: "hostname is required"}
+	}
+	port := m.Port
+	if port == 0 {
+		port = 3306
+	}
+	addr := fmt.Sprintf("%s:%d", host, port)
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", addr, time.Duration(m.Timeout)*time.Second)
+	if err != nil {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: err.Error()}
+	}
+	defer conn.Close()
+	ping := int(time.Since(start).Milliseconds())
+	return &monitor.CheckResult{Status: monitor.StatusUp, Ping: ping, Msg: "MySQL port reachable"}
+}
+
+// WebSocketChecker checks WebSocket upgrade connectivity
+type WebSocketChecker struct{}
+
+func (c *WebSocketChecker) Check(ctx context.Context, m *monitor.Monitor) *monitor.CheckResult {
+	urlStr := m.URL
+	if urlStr == "" {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: "URL is required"}
+	}
+	start := time.Now()
+	dialer := websocket.Dialer{HandshakeTimeout: time.Duration(m.Timeout) * time.Second}
+	conn, _, err := dialer.Dial(urlStr, nil)
+	if err != nil {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: err.Error()}
+	}
+	defer conn.Close()
+	ping := int(time.Since(start).Milliseconds())
+	return &monitor.CheckResult{Status: monitor.StatusUp, Ping: ping, Msg: "WebSocket connected"}
+}
+
+// SMTPChecker checks SMTP server connectivity
+type SMTPChecker struct{}
+
+func (c *SMTPChecker) Check(ctx context.Context, m *monitor.Monitor) *monitor.CheckResult {
+	host := m.Hostname
+	if host == "" {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: "hostname is required"}
+	}
+	port := m.Port
+	if port == 0 {
+		port = 587
+	}
+	addr := fmt.Sprintf("%s:%d", host, port)
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", addr, time.Duration(m.Timeout)*time.Second)
+	if err != nil {
+		return &monitor.CheckResult{Status: monitor.StatusDown, Msg: err.Error()}
+	}
+	defer conn.Close()
+	ping := int(time.Since(start).Milliseconds())
+	return &monitor.CheckResult{Status: monitor.StatusUp, Ping: ping, Msg: "SMTP port reachable"}
 }
 
 // NewCheckerRegistry creates a new registry with all checkers registered
@@ -41,6 +149,33 @@ func NewCheckerRegistry() *CheckerRegistry {
 	registry.Register(monitor.TypeDNS, &DNSChecker{})
 	registry.Register(monitor.TypeKeyword, &KeywordChecker{})
 	registry.Register(monitor.TypeJSONQuery, &JSONQueryChecker{})
+	registry.Register(monitor.TypeWebSocket, &WebSocketChecker{})
+	registry.Register(monitor.TypeMySQL, &MySQLChecker{})
+	registry.Register(monitor.TypeSMTP, &SMTPChecker{})
+	// TCP-based connectivity checkers for database / protocol types
+	registry.Register(monitor.TypePostgreSQL, &PortChecker{Name: "PostgreSQL", DefaultPort: 5432})
+	registry.Register(monitor.TypeRedis, &PortChecker{Name: "Redis", DefaultPort: 6379})
+	registry.Register(monitor.TypeMongoDB, &PortChecker{Name: "MongoDB", DefaultPort: 27017})
+	registry.Register(monitor.TypeSQLServer, &PortChecker{Name: "SQL Server", DefaultPort: 1433})
+	registry.Register(monitor.TypeOracleDB, &PortChecker{Name: "Oracle", DefaultPort: 1521})
+	registry.Register(monitor.TypeRADIUS, &PortChecker{Name: "RADIUS", DefaultPort: 1812})
+	registry.Register(monitor.TypeMQTT, &PortChecker{Name: "MQTT", DefaultPort: 1883})
+	registry.Register(monitor.TypeRabbitMQ, &PortChecker{Name: "RabbitMQ", DefaultPort: 5672})
+	registry.Register(monitor.TypeKafka, &PortChecker{Name: "Kafka", DefaultPort: 9092})
+	registry.Register(monitor.TypeSIP, &PortChecker{Name: "SIP", DefaultPort: 5060})
+	registry.Register(monitor.TypeTailscalePing, &PortChecker{Name: "Tailscale", DefaultPort: 80})
+
+	// Stub checkers for types requiring special libraries or APIs
+	registry.Register(monitor.TypeDocker, &StubChecker{Name: "Docker"})
+	registry.Register(monitor.TypePush, &StubChecker{Name: "Push"})
+	registry.Register(monitor.TypeManual, &StubChecker{Name: "Manual"})
+	registry.Register(monitor.TypeSystemService, &StubChecker{Name: "System Service"})
+	registry.Register(monitor.TypeRealBrowser, &StubChecker{Name: "Browser Engine"})
+	registry.Register(monitor.TypeGRPCKeyword, &StubChecker{Name: "gRPC"})
+	registry.Register(monitor.TypeSNMP, &StubChecker{Name: "SNMP"})
+	registry.Register(monitor.TypeGlobalping, &StubChecker{Name: "Globalping"})
+	registry.Register(monitor.TypeGameDig, &StubChecker{Name: "GameDig"})
+	registry.Register(monitor.TypeSteam, &StubChecker{Name: "Steam"})
 
 	return registry
 }

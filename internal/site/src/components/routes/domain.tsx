@@ -1,11 +1,20 @@
-import { memo, useState } from "react"
+import { memo, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Trans } from "@lingui/react/macro"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+AlertDialog,
+AlertDialogAction,
+AlertDialogCancel,
+AlertDialogContent,
+AlertDialogDescription,
+AlertDialogFooter,
+AlertDialogHeader,
+AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
 	Globe,
 	Calendar,
@@ -20,18 +29,15 @@ import {
 	CheckCircle2,
 	AlertTriangle,
 	XCircle,
-	Lock,
-	Key,
-	Fingerprint,
 	FileText,
 	User,
 	Mail,
-	Phone,
 	Building,
 } from "lucide-react"
-import { getDomain, getDomainHistory, refreshDomain, formatDate, formatDays } from "@/lib/domains"
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
+import { getDomain, getDomainHistory, refreshDomain, deleteDomain, formatDate, formatDays } from "@/lib/domains"
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from "recharts"
 import { Link, navigate } from "@/components/router"
+import { DomainDialog } from "@/components/domains-table/domain-dialog"
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
@@ -77,17 +83,19 @@ function InfoCard({ title, value, icon: Icon, subtitle, className }: { title: st
 
 export default memo(function DomainDetail({ id }: { id: string }) {
 	const { toast } = useToast()
-	const [activeTab, setActiveTab] = useState("overview")
+	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
 	const { data: domain, isLoading: isDomainLoading } = useQuery({
 		queryKey: ["domain", id],
 		queryFn: () => getDomain(id),
-		refetchInterval: 60000,
+		refetchInterval: 30000,
 	})
 
 	const { data: history } = useQuery({
 		queryKey: ["domain-history", id],
 		queryFn: () => getDomainHistory(id),
+		refetchInterval: 60000,
 	})
 
 	const handleRefresh = async () => {
@@ -103,12 +111,39 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 	}
 
 	const handleDelete = () => {
-		if (confirm("Are you sure you want to delete this domain?")) {
-			// Delete domain logic would go here
+		setIsDeleteDialogOpen(true)
+	}
+
+	const handleDeleteConfirm = async () => {
+		if (!domain?.id) return
+		try {
+			await deleteDomain(domain.id)
 			toast({ title: "Domain deleted" })
 			navigate("/")
+		} catch (error) {
+			toast({
+				title: "Failed to delete domain",
+				variant: "destructive",
+			})
+		} finally {
+			setIsDeleteDialogOpen(false)
 		}
 	}
+
+	// Prepare chart data from history (events by date)
+	const chartData = useMemo(() => {
+		if (!history?.length) return []
+		const counts: Record<string, number> = {}
+		history.forEach((h: any) => {
+			const d = h.created_at
+				? new Date(h.created_at).toISOString().split("T")[0]
+				: "Unknown"
+			counts[d] = (counts[d] || 0) + 1
+		})
+		return Object.entries(counts)
+			.map(([date, count]) => ({ date, count }))
+			.sort((a, b) => a.date.localeCompare(b.date))
+	}, [history])
 
 	if (isDomainLoading) {
 		return (
@@ -130,13 +165,6 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 			</div>
 		)
 	}
-
-	// Prepare chart data from history
-	const chartData = history?.map((h: any) => ({
-		date: new Date(h.created).toLocaleDateString(),
-		daysUntilExpiry: h.days_until_expiry || 0,
-		sslDaysUntil: h.ssl_days_until || 0,
-	})) || []
 
 	return (
 		<div className="grid gap-4 mb-14">
@@ -175,7 +203,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 									<Trans>Visit</Trans>
 								</a>
 							</Button>
-							<Button variant="outline" size="sm">
+							<Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
 								<Edit3 className="mr-2 h-4 w-4" />
 								<Trans>Edit</Trans>
 							</Button>
@@ -200,14 +228,14 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 					value={formatDate(domain.expiry_date)}
 					subtitle={formatDays(domain.days_until_expiry)}
 					icon={Calendar}
-					className={domain.days_until_expiry !== undefined && domain.days_until_expiry <= 30 ? "text-yellow-600" : ""}
+					className={domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30 ? "text-yellow-600" : ""}
 				/>
 				<InfoCard
 					title="SSL Expiry"
 					value={domain.ssl_valid_to ? formatDate(domain.ssl_valid_to) : "No SSL"}
 					subtitle={domain.ssl_valid_to ? formatDays(domain.ssl_days_until) : undefined}
 					icon={Shield}
-					className={domain.ssl_days_until !== undefined && domain.ssl_days_until <= 14 ? "text-red-600" : ""}
+					className={domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 14 ? "text-red-600" : ""}
 				/>
 				<InfoCard
 					title="Location"
@@ -217,74 +245,73 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 				/>
 			</div>
 
-			{/* Tabs */}
-			<Tabs value={activeTab} onValueChange={setActiveTab} className="contents">
-				<TabsList className="h-11 p-1.5 w-full shadow-xs overflow-auto justify-start">
-					<TabsTrigger value="overview" className="flex items-center gap-1.5 px-4">
-						<Globe className="size-3.5" />
-						<Trans>Overview</Trans>
-					</TabsTrigger>
-					<TabsTrigger value="dns" className="flex items-center gap-1.5 px-4">
-						<Server className="size-3.5" />
-						<Trans>DNS Records</Trans>
-					</TabsTrigger>
-					<TabsTrigger value="ssl" className="flex items-center gap-1.5 px-4">
-						<Lock className="size-3.5" />
-						<Trans>SSL Certificate</Trans>
-					</TabsTrigger>
-					<TabsTrigger value="whois" className="flex items-center gap-1.5 px-4">
-						<FileText className="size-3.5" />
-						<Trans>WHOIS Info</Trans>
-					</TabsTrigger>
-					<TabsTrigger value="history" className="flex items-center gap-1.5 px-4">
-						<Clock className="size-3.5" />
-						<Trans>History</Trans>
-					</TabsTrigger>
-				</TabsList>
+			{/* Expiry Comparison Chart */}
+			<Card>
+				<CardHeader>
+					<CardTitle>Expiry Overview</CardTitle>
+					<CardDescription>Days remaining until domain and SSL certificate expiration</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<div className="h-[200px]">
+						<ResponsiveContainer width="100%" height="100%">
+							<BarChart
+								data={[
+									...(typeof domain.days_until_expiry === "number" && domain.days_until_expiry >= 0
+										? [{ name: "Domain Expiry", days: domain.days_until_expiry }]
+										: []),
+									...(typeof domain.ssl_days_until === "number" && domain.ssl_days_until >= 0
+										? [{ name: "SSL Expiry", days: domain.ssl_days_until }]
+										: []),
+								]}
+								layout="vertical"
+							>
+								<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+								<XAxis type="number" tick={{ fontSize: 12 }} />
+								<YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={100} />
+								<Tooltip
+									formatter={(value: number) => [`${value} days`, "Remaining"]}
+									contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+								/>
+								<Bar dataKey="days" radius={[0, 4, 4, 0]}>
+									{[
+										{ days: domain.days_until_expiry ?? 0 },
+										{ days: domain.ssl_days_until ?? 0 },
+									].map((entry, index) => (
+											<Cell
+												key={`cell-${index}`}
+												fill={
+													entry.days <= 14
+														? "#ef4444"
+														: entry.days <= 30
+															? "#f59e0b"
+															: "#22c55e"
+												}
+											/>
+										))}
+									</Bar>
+								</BarChart>
+							</ResponsiveContainer>
+						</div>
+					</CardContent>
+				</Card>
 
-				<TabsContent value="overview" className="contents">
-					<div className="grid gap-4">
-						{/* Expiry Timeline Chart */}
+			<div className="grid gap-4">
+				{/* Expiry Timeline Chart */}
 						<Card>
 							<CardHeader>
-								<CardTitle>Domain Expiry Timeline</CardTitle>
-								<CardDescription>Days until domain and SSL expiry over time</CardDescription>
+								<CardTitle>History Events</CardTitle>
+								<CardDescription>Domain changes and check events over time</CardDescription>
 							</CardHeader>
 							<CardContent>
 								<div className="h-[300px]">
 									<ResponsiveContainer width="100%" height="100%">
-										<AreaChart data={chartData}>
-											<defs>
-												<linearGradient id="colorDomain" x1="0" y1="0" x2="0" y2="1">
-													<stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-													<stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-												</linearGradient>
-												<linearGradient id="colorSsl" x1="0" y1="0" x2="0" y2="1">
-													<stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-													<stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-												</linearGradient>
-											</defs>
+										<BarChart data={chartData}>
 											<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
 											<XAxis dataKey="date" tick={{ fontSize: 12 }} />
-											<YAxis tick={{ fontSize: 12 }} />
+											<YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
 											<Tooltip />
-											<Area
-												type="monotone"
-												dataKey="daysUntilExpiry"
-												stroke="#3b82f6"
-												fillOpacity={1}
-												fill="url(#colorDomain)"
-												name="Domain Days"
-											/>
-											<Area
-												type="monotone"
-												dataKey="sslDaysUntil"
-												stroke="#22c55e"
-												fillOpacity={1}
-												fill="url(#colorSsl)"
-												name="SSL Days"
-											/>
-										</AreaChart>
+											<Bar dataKey="count" fill="#3b82f6" name="Events" />
+										</BarChart>
 									</ResponsiveContainer>
 								</div>
 							</CardContent>
@@ -354,9 +381,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 							</Card>
 						)}
 					</div>
-				</TabsContent>
 
-				<TabsContent value="dns" className="contents">
 					<div className="grid gap-4">
 						<Card>
 							<CardHeader>
@@ -434,9 +459,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 							</CardContent>
 						</Card>
 					</div>
-				</TabsContent>
 
-				<TabsContent value="ssl" className="contents">
 					<div className="grid gap-4">
 						<Card>
 							<CardHeader>
@@ -458,7 +481,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 												value={formatDate(domain.ssl_valid_to)}
 												subtitle={formatDays(domain.ssl_days_until)}
 												icon={Shield}
-												className={domain.ssl_days_until !== undefined && domain.ssl_days_until <= 14 ? "text-red-600" : ""}
+												className={domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 14 ? "text-red-600" : ""}
 											/>
 										</div>
 
@@ -511,9 +534,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 							</CardContent>
 						</Card>
 					</div>
-				</TabsContent>
 
-				<TabsContent value="whois" className="contents">
 					<div className="grid gap-4">
 						<Card>
 							<CardHeader>
@@ -634,7 +655,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 								)}
 
 								{/* Domain Status */}
-								{domain.status && domain.status !== "Unknown" && (
+								{domain.status && domain.status !== "unknown" && (
 									<div className="space-y-2 pt-4 border-t">
 										<h4 className="text-sm font-medium flex items-center gap-2">
 											<Shield className="h-4 w-4" />
@@ -650,9 +671,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 							</CardContent>
 						</Card>
 					</div>
-				</TabsContent>
 
-				<TabsContent value="history" className="contents">
 					<Card>
 						<CardHeader>
 							<CardTitle>Change History</CardTitle>
@@ -669,7 +688,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 											<p className="font-medium">{item.change_type}</p>
 											<p className="text-sm text-muted-foreground">{item.change_description}</p>
 											<p className="text-xs text-muted-foreground mt-1">
-												{new Date(item.created).toLocaleString()}
+												{new Date(item.created_at || item.created).toLocaleString()}
 											</p>
 										</div>
 									</div>
@@ -680,8 +699,32 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 							</div>
 						</CardContent>
 					</Card>
-				</TabsContent>
-			</Tabs>
+			<DomainDialog
+				open={isEditDialogOpen}
+				onOpenChange={setIsEditDialogOpen}
+				domain={domain}
+				isEdit
+			/>
+
+			<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete Domain</AlertDialogTitle>
+						<AlertDialogDescription>
+							Are you sure you want to delete this domain? This action cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleDeleteConfirm}
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	)
 })
