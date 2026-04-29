@@ -8,26 +8,57 @@ Beszel is a unified monitoring platform that combines system metrics, service up
 
 ### Docker Compose
 
-```bash
-# Clone the repository
-git clone https://github.com/henrygd/beszel.git
-cd beszel
+Paste this into Dokploy, CasaOS, or a local `docker-compose.yml`.
 
-# Copy and edit environment variables (optional)
-cp .env.example .env
+```yaml
+services:
+  beszel:
+    image: ghcr.io/dvorinka/beszel:latest
+    container_name: beszel
+    restart: unless-stopped
+    ports:
+      - "${BESZEL_PORT:-8090}:8090"
+    volumes:
+      - beszel_data:/beszel_data
+    environment:
+      APP_URL: "${APP_URL:-http://localhost:8090}"
+      PUBLIC_URL: "${PUBLIC_URL:-}"
+      INSTANCE_NAME: "${INSTANCE_NAME:-Beszel Monitoring}"
+      INSTANCE_DESCRIPTION: "${INSTANCE_DESCRIPTION:-System, website, and domain monitoring}"
 
-# Start the hub
-make start
-# or: docker compose up -d
+      # Optional first admin/user bootstrap. Set these in Dokploy/CasaOS variables.
+      BESZEL_HUB_USER_EMAIL: "${BESZEL_HUB_USER_EMAIL:-}"
+      BESZEL_HUB_USER_PASSWORD: "${BESZEL_HUB_USER_PASSWORD:-}"
 
-# View logs
-make logs
+      # Optional stable Web Push key. Leave empty unless you already have one.
+      BESZEL_VAPID_PRIVATE_KEY: "${BESZEL_VAPID_PRIVATE_KEY:-}"
 
-# Stop everything
-make stop
+      # Auth and feature flags
+      REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-true}"
+      TWO_FACTOR_ENABLED: "${TWO_FACTOR_ENABLED:-true}"
+      PASSKEY_ENABLED: "${PASSKEY_ENABLED:-true}"
+      STATUS_PAGES_ENABLED: "${STATUS_PAGES_ENABLED:-true}"
+      BADGES_ENABLED: "${BADGES_ENABLED:-true}"
+      PAGESPEED_ENABLED: "${PAGESPEED_ENABLED:-true}"
+      SUBDOMAIN_DISCOVERY: "${SUBDOMAIN_DISCOVERY:-true}"
+
+      # Limits
+      MAX_MONITORS_PER_USER: "${MAX_MONITORS_PER_USER:-50}"
+      MAX_DOMAINS_PER_USER: "${MAX_DOMAINS_PER_USER:-50}"
+      MAX_STATUS_PAGES: "${MAX_STATUS_PAGES:-10}"
+
+volumes:
+  beszel_data:
 ```
 
-The hub will be available at `http://localhost:8090`. Create your admin account on first visit.
+Docker Compose pulls the image automatically, or you can pull it manually first:
+
+```bash
+docker pull ghcr.io/dvorinka/beszel:latest
+docker compose up -d
+```
+
+The hub will be available at `http://localhost:8090` by default. For Dokploy or CasaOS, set `APP_URL` to the public URL of your deployment, for example `https://beszel.example.com`.
 
 Agents run on separate hosts and connect to the hub. See [Adding Agents](#adding-agents) below.
 
@@ -35,8 +66,14 @@ Agents run on separate hosts and connect to the hub. See [Adding Agents](#adding
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `BESZEL_PORT` | `8090` | Host port mapped to container port `8090` |
 | `APP_URL` | `http://localhost:8090` | Public URL for links |
+| `PUBLIC_URL` | empty | Public URL shown in instance settings |
 | `INSTANCE_NAME` | `Beszel Monitoring` | Instance display name |
+| `INSTANCE_DESCRIPTION` | `System, website, and domain monitoring` | Instance description |
+| `BESZEL_HUB_USER_EMAIL` | empty | Optional first admin/user email for automated setup |
+| `BESZEL_HUB_USER_PASSWORD` | empty | Optional first admin/user password for automated setup |
+| `BESZEL_VAPID_PRIVATE_KEY` | empty | Optional stable private key for browser push notifications |
 | `REGISTRATION_ENABLED` | `true` | Allow new user registration |
 | `MAX_MONITORS_PER_USER` | `50` | Monitor limit per user |
 | `MAX_DOMAINS_PER_USER` | `50` | Domain limit per user |

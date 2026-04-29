@@ -267,13 +267,8 @@ func (h *Hub) bindDomainHooks() {
 		return e.Next()
 	})
 
-	// On update - refresh if activated
-	h.OnRecordAfterUpdateSuccess("domains").BindFunc(func(e *core.RecordEvent) error {
-		if e.Record.GetBool("active") {
-			h.domainSched.RefreshDomain(e.Record.Id)
-		}
-		return e.Next()
-	})
+	// Manual refresh and resume actions trigger lookups explicitly. Avoid
+	// refreshing on every domain save because scheduler writes would loop.
 }
 
 // GetSSHKey generates key pair if it doesn't exist and returns signer

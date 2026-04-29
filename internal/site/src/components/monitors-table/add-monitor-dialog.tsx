@@ -35,40 +35,13 @@ import {
 } from "@/lib/monitors"
 
 const MONITOR_TYPES: { value: MonitorType; label: string; group: string }[] = [
-	// General
 	{ value: "http", label: "HTTP", group: "General" },
 	{ value: "https", label: "HTTPS", group: "General" },
 	{ value: "keyword", label: "HTTP Keyword", group: "General" },
 	{ value: "json-query", label: "HTTP JSON", group: "General" },
-	{ value: "grpc-keyword", label: "gRPC Keyword", group: "General" },
-	{ value: "real-browser", label: "Browser Engine (Beta)", group: "General" },
 	{ value: "tcp", label: "TCP Port", group: "General" },
 	{ value: "ping", label: "Ping", group: "General" },
 	{ value: "dns", label: "DNS", group: "General" },
-	{ value: "docker", label: "Docker Container", group: "General" },
-	{ value: "push", label: "Push", group: "General" },
-	{ value: "manual", label: "Manual", group: "General" },
-	// Network / Protocol
-	{ value: "mqtt", label: "MQTT", group: "Network / Protocol" },
-	{ value: "rabbitmq", label: "RabbitMQ", group: "Network / Protocol" },
-	{ value: "kafka-producer", label: "Kafka Producer", group: "Network / Protocol" },
-	{ value: "smtp", label: "SMTP", group: "Network / Protocol" },
-	{ value: "snmp", label: "SNMP", group: "Network / Protocol" },
-	{ value: "websocket-upgrade", label: "WebSocket Upgrade", group: "Network / Protocol" },
-	{ value: "sip-options", label: "SIP Options Ping", group: "Network / Protocol" },
-	{ value: "tailscale-ping", label: "Tailscale Ping", group: "Network / Protocol" },
-	{ value: "globalping", label: "Globalping", group: "Network / Protocol" },
-	// Database
-	{ value: "mysql", label: "MySQL / MariaDB", group: "Database" },
-	{ value: "postgresql", label: "PostgreSQL", group: "Database" },
-	{ value: "mongodb", label: "MongoDB", group: "Database" },
-	{ value: "redis", label: "Redis", group: "Database" },
-	{ value: "sqlserver", label: "Microsoft SQL Server", group: "Database" },
-	{ value: "oracledb", label: "Oracle DB", group: "Database" },
-	{ value: "radius", label: "RADIUS", group: "Database" },
-	// Games
-	{ value: "gamedig", label: "GameDig", group: "Game Server" },
-	{ value: "steam", label: "Steam API", group: "Game Server" },
 ]
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"]
@@ -82,12 +55,7 @@ interface AddMonitorDialogProps {
 	isEdit?: boolean
 }
 
-export function AddMonitorDialog({
-	open,
-	onOpenChange,
-	monitor,
-	isEdit = false,
-}: AddMonitorDialogProps) {
+export function AddMonitorDialog({ open, onOpenChange, monitor, isEdit = false }: AddMonitorDialogProps) {
 	const { t } = useLingui()
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
@@ -123,7 +91,7 @@ export function AddMonitorDialog({
 	const [dbName, setDbName] = useState("")
 	const [mqttTopic, setMqttTopic] = useState("")
 	const [grpcKeyword, setGrpcKeyword] = useState("")
-	
+
 	// Notification settings
 	const [notifyOnDown, setNotifyOnDown] = useState(true)
 	const [notifyOnRecover, setNotifyOnRecover] = useState(true)
@@ -163,7 +131,7 @@ export function AddMonitorDialog({
 				setIgnoreTLSError(monitor.ignore_tls_error || false)
 				setCertExpiryNotification(monitor.cert_expiry_notification || false)
 				setCertExpiryDays(monitor.cert_expiry_days || 14)
-				
+
 				// Load notification settings
 				setNotifyOnDown(monitor.notify_on_down !== false)
 				setNotifyOnRecover(monitor.notify_on_recover !== false)
@@ -199,7 +167,7 @@ export function AddMonitorDialog({
 				setIgnoreTLSError(false)
 				setCertExpiryNotification(false)
 				setCertExpiryDays(14)
-				
+
 				// Reset notification settings
 				setNotifyOnDown(true)
 				setNotifyOnRecover(true)
@@ -234,8 +202,7 @@ export function AddMonitorDialog({
 	})
 
 	const updateMutation = useMutation({
-		mutationFn: ({ id, data }: { id: string; data: UpdateMonitorRequest }) =>
-			updateMonitor(id, data),
+		mutationFn: ({ id, data }: { id: string; data: UpdateMonitorRequest }) => updateMonitor(id, data),
 		onSuccess: () => {
 			toast({ title: t`Monitor updated successfully` })
 			queryClient.invalidateQueries({ queryKey: ["monitors"] })
@@ -264,9 +231,7 @@ export function AddMonitorDialog({
 				url: needsDbOptions ? dbConnectionString.trim() || undefined : url.trim() || undefined,
 				hostname: needsHostname ? hostname.trim() || undefined : undefined,
 				port: port ? Number(port) : undefined,
-				method: ["http", "https", "keyword", "json-query"].includes(type)
-					? method
-					: undefined,
+				method: ["http", "https", "keyword", "json-query"].includes(type) ? method : undefined,
 				headers: headers.trim() || undefined,
 				body: body.trim() || undefined,
 				interval,
@@ -279,10 +244,7 @@ export function AddMonitorDialog({
 				dns_resolve_server: type === "dns" ? dnsResolveServer.trim() : undefined,
 				dns_resolver_mode: type === "dns" ? dnsResolverMode : undefined,
 				description: description.trim() || undefined,
-				ignore_tls_error:
-					type === "https" || type === "keyword" || type === "json-query"
-						? ignoreTLSError
-						: undefined,
+				ignore_tls_error: type === "https" || type === "keyword" || type === "json-query" ? ignoreTLSError : undefined,
 				cert_expiry_notification: type === "https" ? certExpiryNotification : undefined,
 				cert_expiry_days: type === "https" ? certExpiryDays : undefined,
 				// Notification settings
@@ -312,9 +274,7 @@ export function AddMonitorDialog({
 				url: needsDbOptions ? dbConnectionString.trim() || undefined : url.trim() || undefined,
 				hostname: needsHostname ? hostname.trim() || undefined : undefined,
 				port: port ? Number(port) : undefined,
-				method: ["http", "https", "keyword", "json-query"].includes(type)
-					? method
-					: undefined,
+				method: ["http", "https", "keyword", "json-query"].includes(type) ? method : undefined,
 				headers: headers.trim() || undefined,
 				body: body.trim() || undefined,
 				interval,
@@ -327,10 +287,7 @@ export function AddMonitorDialog({
 				dns_resolve_server: type === "dns" ? dnsResolveServer.trim() : undefined,
 				dns_resolver_mode: type === "dns" ? dnsResolverMode : undefined,
 				description: description.trim() || undefined,
-				ignore_tls_error:
-					type === "https" || type === "keyword" || type === "json-query"
-						? ignoreTLSError
-						: undefined,
+				ignore_tls_error: type === "https" || type === "keyword" || type === "json-query" ? ignoreTLSError : undefined,
 				cert_expiry_notification: type === "https" ? certExpiryNotification : undefined,
 				cert_expiry_days: type === "https" ? certExpiryDays : undefined,
 				// Notification settings
@@ -356,9 +313,54 @@ export function AddMonitorDialog({
 		}
 	}
 
-	const needsUrl = ["http", "https", "keyword", "json-query", "grpc-keyword", "real-browser", "websocket-upgrade", "push"].includes(type)
-	const needsHostname = ["tcp", "ping", "dns", "mqtt", "rabbitmq", "kafka-producer", "smtp", "snmp", "sip-options", "tailscale-ping", "globalping", "mysql", "postgresql", "mongodb", "redis", "sqlserver", "oracledb", "radius", "gamedig", "steam"].includes(type)
-	const needsPort = ["tcp", "smtp", "mysql", "postgresql", "redis", "sqlserver", "oracledb", "radius", "mqtt", "rabbitmq", "kafka-producer", "gamedig", "steam", "snmp"].includes(type)
+	const needsUrl = [
+		"http",
+		"https",
+		"keyword",
+		"json-query",
+		"grpc-keyword",
+		"real-browser",
+		"websocket-upgrade",
+		"push",
+	].includes(type)
+	const needsHostname = [
+		"tcp",
+		"ping",
+		"dns",
+		"mqtt",
+		"rabbitmq",
+		"kafka-producer",
+		"smtp",
+		"snmp",
+		"sip-options",
+		"tailscale-ping",
+		"globalping",
+		"mysql",
+		"postgresql",
+		"mongodb",
+		"redis",
+		"sqlserver",
+		"oracledb",
+		"radius",
+		"gamedig",
+		"steam",
+	].includes(type)
+	const needsPort = [
+		"tcp",
+		"smtp",
+		"mysql",
+		"postgresql",
+		"redis",
+		"sqlserver",
+		"oracledb",
+		"radius",
+		"mqtt",
+		"rabbitmq",
+		"kafka-producer",
+		"gamedig",
+		"steam",
+		"snmp",
+	].includes(type)
 	const needsHttpOptions = ["http", "https", "keyword", "json-query"].includes(type)
 	const needsKeyword = type === "keyword"
 	const needsJsonQuery = type === "json-query"
@@ -374,13 +376,9 @@ export function AddMonitorDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
 				<DialogHeader>
-					<DialogTitle>
-						{isEdit ? <Trans>Edit Monitor</Trans> : <Trans>Add Monitor</Trans>}
-					</DialogTitle>
+					<DialogTitle>{isEdit ? <Trans>Edit Monitor</Trans> : <Trans>Add Monitor</Trans>}</DialogTitle>
 					<DialogDescription>
-						<Trans>
-							Configure a monitor to track website or service availability.
-						</Trans>
+						<Trans>Configure a monitor to track website or service availability.</Trans>
 					</DialogDescription>
 				</DialogHeader>
 
@@ -419,10 +417,7 @@ export function AddMonitorDialog({
 									<Label htmlFor="type">
 										<Trans>Monitor Type</Trans> *
 									</Label>
-									<Select
-										value={type}
-										onValueChange={(v) => setType(v as MonitorType)}
-									>
+									<Select value={type} onValueChange={(v) => setType(v as MonitorType)}>
 										<SelectTrigger id="type">
 											<SelectValue />
 										</SelectTrigger>
@@ -431,10 +426,10 @@ export function AddMonitorDialog({
 												<SelectGroup key={group}>
 													<SelectLabel>{group}</SelectLabel>
 													{MONITOR_TYPES.filter((mt) => mt.group === group).map((mt) => (
-															<SelectItem key={mt.value} value={mt.value}>
-																{mt.label}
-															</SelectItem>
-														))}
+														<SelectItem key={mt.value} value={mt.value}>
+															{mt.label}
+														</SelectItem>
+													))}
 												</SelectGroup>
 											))}
 										</SelectContent>
@@ -481,11 +476,7 @@ export function AddMonitorDialog({
 											type="number"
 											placeholder={t`443`}
 											value={port}
-											onChange={(e) =>
-												setPort(
-													e.target.value ? Number(e.target.value) : ""
-												)
-											}
+											onChange={(e) => setPort(e.target.value ? Number(e.target.value) : "")}
 											required
 										/>
 									</div>
@@ -524,11 +515,7 @@ export function AddMonitorDialog({
 											required
 										/>
 										<div className="flex items-center gap-2 mt-2">
-											<Switch
-												id="invertKeyword"
-												checked={invertKeyword}
-												onCheckedChange={setInvertKeyword}
-											/>
+											<Switch id="invertKeyword" checked={invertKeyword} onCheckedChange={setInvertKeyword} />
 											<Label htmlFor="invertKeyword">
 												<Trans>Invert match (alert if keyword found)</Trans>
 											</Label>
@@ -570,10 +557,7 @@ export function AddMonitorDialog({
 											<Label htmlFor="dnsResolverMode">
 												<Trans>Record Type</Trans>
 											</Label>
-											<Select
-												value={dnsResolverMode}
-												onValueChange={setDnsResolverMode}
-											>
+											<Select value={dnsResolverMode} onValueChange={setDnsResolverMode}>
 												<SelectTrigger id="dnsResolverMode">
 													<SelectValue />
 												</SelectTrigger>
@@ -774,11 +758,7 @@ export function AddMonitorDialog({
 							{needsTlsOptions && (
 								<div className="space-y-4 border rounded-lg p-4">
 									<div className="flex items-center gap-2">
-										<Switch
-											id="ignoreTLSError"
-											checked={ignoreTLSError}
-											onCheckedChange={setIgnoreTLSError}
-										/>
+										<Switch id="ignoreTLSError" checked={ignoreTLSError} onCheckedChange={setIgnoreTLSError} />
 										<Label htmlFor="ignoreTLSError">
 											<Trans>Ignore TLS/SSL errors</Trans>
 										</Label>
@@ -791,17 +771,13 @@ export function AddMonitorDialog({
 							{/* Status Change Notifications */}
 							<div className="space-y-4 border rounded-lg p-4">
 								<h4 className="font-medium text-sm">Status Change Alerts</h4>
-								
+
 								<div className="flex items-center justify-between">
 									<div className="space-y-0.5">
 										<Label htmlFor="notifyOnDown">Notify when monitor goes down</Label>
 										<p className="text-xs text-muted-foreground">Send alert when service becomes unavailable</p>
 									</div>
-									<Switch
-										id="notifyOnDown"
-										checked={notifyOnDown}
-										onCheckedChange={setNotifyOnDown}
-									/>
+									<Switch id="notifyOnDown" checked={notifyOnDown} onCheckedChange={setNotifyOnDown} />
 								</div>
 
 								<div className="flex items-center justify-between">
@@ -809,11 +785,7 @@ export function AddMonitorDialog({
 										<Label htmlFor="notifyOnRecover">Notify when monitor recovers</Label>
 										<p className="text-xs text-muted-foreground">Send alert when service comes back up</p>
 									</div>
-									<Switch
-										id="notifyOnRecover"
-										checked={notifyOnRecover}
-										onCheckedChange={setNotifyOnRecover}
-									/>
+									<Switch id="notifyOnRecover" checked={notifyOnRecover} onCheckedChange={setNotifyOnRecover} />
 								</div>
 
 								<div className="space-y-3">
@@ -848,7 +820,7 @@ export function AddMonitorDialog({
 							{/* Performance Alerts */}
 							<div className="space-y-4 border rounded-lg p-4">
 								<h4 className="font-medium text-sm">Performance Alerts</h4>
-								
+
 								<div className="space-y-3">
 									<div className="flex items-center justify-between">
 										<div className="space-y-0.5">
@@ -947,11 +919,7 @@ export function AddMonitorDialog({
 										<Label htmlFor="quietHoursEnabled">Enable quiet hours</Label>
 										<p className="text-xs text-muted-foreground">Suppress notifications during specific hours</p>
 									</div>
-									<Switch
-										id="quietHoursEnabled"
-										checked={quietHoursEnabled}
-										onCheckedChange={setQuietHoursEnabled}
-									/>
+									<Switch id="quietHoursEnabled" checked={quietHoursEnabled} onCheckedChange={setQuietHoursEnabled} />
 								</div>
 								{quietHoursEnabled && (
 									<div className="grid grid-cols-2 gap-4 pl-4 border-l-2">
@@ -980,12 +948,7 @@ export function AddMonitorDialog({
 					</Tabs>
 
 					<DialogFooter className="mt-6">
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => onOpenChange(false)}
-							disabled={isPending}
-						>
+						<Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
 							<Trans>Cancel</Trans>
 						</Button>
 						<Button type="submit" disabled={isPending}>

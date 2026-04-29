@@ -29,7 +29,13 @@ export interface Domain {
 	ssl_signature_algo?: string
 	ssl_fingerprint?: string
 	host_country?: string
+	host_region?: string
+	host_city?: string
 	host_isp?: string
+	host_org?: string
+	host_as?: string
+	host_lat?: number
+	host_lon?: number
 	purchase_price?: number
 	current_value?: number
 	renewal_cost?: number
@@ -43,6 +49,17 @@ export interface Domain {
 	registrant_state?: string
 	abuse_email?: string
 	abuse_phone?: string
+	monitor_type?: "expiry" | "watchlist" | "portfolio"
+	ssl_alert_days?: number
+	notify_on_expiry?: boolean
+	notify_on_ssl_expiry?: boolean
+	notify_on_dns_change?: boolean
+	notify_on_registrar_change?: boolean
+	notify_on_value_change?: boolean
+	value_change_threshold?: number
+	quiet_hours_enabled?: boolean
+	quiet_hours_start?: string
+	quiet_hours_end?: string
 	tags?: string[]
 	notes?: string
 	favicon_url?: string
@@ -109,6 +126,17 @@ export interface CreateDomainRequest {
 	auto_renew?: boolean
 	alert_days_before?: number
 	ssl_alert_enabled?: boolean
+	ssl_alert_days?: number
+	monitor_type?: "expiry" | "watchlist" | "portfolio"
+	notify_on_expiry?: boolean
+	notify_on_ssl_expiry?: boolean
+	notify_on_dns_change?: boolean
+	notify_on_registrar_change?: boolean
+	notify_on_value_change?: boolean
+	value_change_threshold?: number
+	quiet_hours_enabled?: boolean
+	quiet_hours_start?: string
+	quiet_hours_end?: string
 }
 
 export interface UpdateDomainRequest {
@@ -121,6 +149,17 @@ export interface UpdateDomainRequest {
 	active?: boolean
 	alert_days_before?: number
 	ssl_alert_enabled?: boolean
+	ssl_alert_days?: number
+	monitor_type?: "expiry" | "watchlist" | "portfolio"
+	notify_on_expiry?: boolean
+	notify_on_ssl_expiry?: boolean
+	notify_on_dns_change?: boolean
+	notify_on_registrar_change?: boolean
+	notify_on_value_change?: boolean
+	value_change_threshold?: number
+	quiet_hours_enabled?: boolean
+	quiet_hours_start?: string
+	quiet_hours_end?: string
 }
 
 export interface DomainLookupResult {
@@ -230,7 +269,7 @@ export async function deleteDomain(id: string): Promise<void> {
 	}
 }
 
-export async function refreshDomain(id: string): Promise<void> {
+export async function refreshDomain(id: string): Promise<Domain> {
 	const response = await fetch(`${API_BASE}/${id}/refresh`, {
 		method: "POST",
 		headers: {
@@ -240,6 +279,7 @@ export async function refreshDomain(id: string): Promise<void> {
 	if (!response.ok) {
 		throw new Error(`Failed to refresh domain: ${response.statusText}`)
 	}
+	return response.json()
 }
 
 export async function getDomainHistory(id: string): Promise<DomainHistory[]> {
@@ -331,7 +371,7 @@ export function cleanDomain(domain: string): string {
 	return domain
 		.replace(/^https?:\/\//, "")
 		.replace(/^www\./, "")
-		.replace(/[\/\?#:].*$/, "")
+		.replace(/[/?#:].*$/, "")
 		.toLowerCase()
 		.trim()
 }

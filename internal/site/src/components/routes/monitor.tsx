@@ -7,14 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-AlertDialog,
-AlertDialogAction,
-AlertDialogCancel,
-AlertDialogContent,
-AlertDialogDescription,
-AlertDialogFooter,
-AlertDialogHeader,
-AlertDialogTitle,
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -32,8 +32,10 @@ import {
 	PlayIcon,
 	TrendingUp,
 	TrendingDown,
+	type LucideIcon,
 } from "lucide-react"
 import {
+	type Heartbeat,
 	getMonitor,
 	getMonitorStats,
 	getMonitorHeartbeats,
@@ -41,13 +43,18 @@ import {
 	pauseMonitor,
 	resumeMonitor,
 	deleteMonitor,
-	updateMonitor,
 	getMonitorTypeLabel,
 	formatUptime,
 	formatPing,
 } from "@/lib/monitors"
 import { formatDate } from "@/lib/domains"
-import { getStatusPages, createStatusPage } from "@/lib/statuspages"
+import {
+	addMonitorToStatusPage,
+	createStatusPage,
+	getStatusPageMonitors,
+	getStatusPages,
+	removeMonitorFromStatusPage,
+} from "@/lib/statuspages"
 import {
 	Bar,
 	XAxis,
@@ -63,6 +70,8 @@ import {
 import { Link, navigate } from "@/components/router"
 import { AddMonitorDialog } from "@/components/monitors-table/add-monitor-dialog"
 import { cn } from "@/lib/utils"
+
+type HeartbeatRow = Heartbeat & { timestamp?: string }
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
@@ -97,7 +106,7 @@ function StatCard({
 }: {
 	title: string
 	value: string
-	icon: any
+	icon: LucideIcon
 	subtitle?: string
 	trend?: "up" | "down" | "neutral"
 	className?: string
@@ -161,6 +170,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 			})
 			queryClient.invalidateQueries({ queryKey: ["monitor", id] })
 			queryClient.invalidateQueries({ queryKey: ["monitor-heartbeats", id] })
+			queryClient.invalidateQueries({ queryKey: ["monitor-stats", id] })
 		},
 	})
 
@@ -191,10 +201,31 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 		queryFn: () => getStatusPages(),
 	})
 
+	const { data: linkedStatusPageMonitors } = useQuery({
+		queryKey: ["monitor-status-page-links", id, statusPages?.map((page) => page.id).join(",")],
+		queryFn: async () => {
+			if (!statusPages?.length) return []
+			const links = await Promise.all(
+				statusPages.map(async (page) =>
+					(await getStatusPageMonitors(page.id)).map((link) => ({ ...link, status_page_id: page.id }))
+				)
+			)
+			return links.flat().filter((link) => link.monitor_id === id)
+		},
+		enabled: Boolean(statusPages?.length),
+	})
+
 	const updateStatusPagesMutation = useMutation({
-		mutationFn: (status_pages: string[]) => updateMonitor(id, { status_pages } as any),
+		mutationFn: async ({ pageId, linked }: { pageId: string; linked: boolean }) => {
+			if (linked) {
+				await removeMonitorFromStatusPage(pageId, id)
+			} else {
+				await addMonitorToStatusPage(pageId, { monitor: id })
+			}
+		},
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["monitor", id] })
+			queryClient.invalidateQueries({ queryKey: ["monitor-status-page-links", id] })
+			queryClient.invalidateQueries({ queryKey: ["status-pages"] })
 			toast({ title: "Status pages updated" })
 		},
 	})
@@ -230,7 +261,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 			"30d": 30 * 24 * 60 * 60 * 1000,
 		}
 		const cutoff = now - (ranges[timeRange] || ranges["24h"])
-		return heartbeats.filter((h: any) => {
+		return heartbeats.filter((h: HeartbeatRow) => {
 			const t = new Date(h.time || h.timestamp).getTime()
 			return t >= cutoff
 		})
@@ -242,7 +273,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 		return filteredHeartbeats
 			.slice()
 			.reverse()
-			.map((h: any) => ({
+			.map((h: HeartbeatRow) => ({
 				time: new Date(h.time || h.timestamp).toLocaleTimeString(),
 				responseTime: h.ping || 0,
 				status: h.status === "up" ? 1 : 0,
@@ -253,8 +284,8 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 	const uptimeStats = useMemo(() => {
 		if (!heartbeats || !Array.isArray(heartbeats) || heartbeats.length === 0) return null
 		const total = heartbeats.length
-		const up = heartbeats.filter((h: any) => h.status === "up").length
-		const avgResponse = heartbeats.reduce((sum: number, h: any) => sum + (h.ping || 0), 0) / total
+		const up = heartbeats.filter((h: HeartbeatRow) => h.status === "up").length
+		const avgResponse = heartbeats.reduce((sum: number, h: HeartbeatRow) => sum + (h.ping || 0), 0) / total
 		return {
 			uptime: ((up / total) * 100).toFixed(2),
 			avgResponse: avgResponse.toFixed(0),
@@ -300,10 +331,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 								)}
 							>
 								<Globe
-									className={cn(
-										"h-6 w-6",
-										isUp ? "text-green-500" : isPaused ? "text-gray-500" : "text-red-500"
-									)}
+									className={cn("h-6 w-6", isUp ? "text-green-500" : isPaused ? "text-gray-500" : "text-red-500")}
 								/>
 							</div>
 							<div>
@@ -311,13 +339,9 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 								<div className="flex items-center gap-2 mt-1">
 									<StatusBadge status={monitor.status} />
 									<Badge variant="secondary">{getMonitorTypeLabel(monitor.type)}</Badge>
-									{monitor.interval && (
-										<Badge variant="outline">{monitor.interval}s interval</Badge>
-									)}
+									{monitor.interval && <Badge variant="outline">{monitor.interval}s interval</Badge>}
 								</div>
-								{monitor.url && (
-									<p className="text-sm text-muted-foreground mt-1">{monitor.url}</p>
-								)}
+								{monitor.url && <p className="text-sm text-muted-foreground mt-1">{monitor.url}</p>}
 							</div>
 						</div>
 						<div className="flex items-center gap-2 flex-wrap">
@@ -371,25 +395,19 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 
 			{/* Summary Bar */}
 			<div className="grid sm:grid-cols-4 gap-4">
-				<StatCard
-					title="Uptime (24h)"
-					value={formatUptime(stats?.uptime_24h ? (stats.uptime_24h.up / stats.uptime_24h.total) * 100 : 0)}
-					icon={Activity}
-				/>
-				<StatCard
-					title="Uptime (7d)"
-					value={formatUptime(stats?.uptime_7d ? (stats.uptime_7d.up / stats.uptime_7d.total) * 100 : 0)}
-					icon={Activity}
-				/>
-				<StatCard
-					title="Uptime (30d)"
-					value={formatUptime(stats?.uptime_30d ? (stats.uptime_30d.up / stats.uptime_30d.total) * 100 : 0)}
-					icon={Activity}
-				/>
+				<StatCard title="Uptime (24h)" value={formatUptime(stats?.uptime_percent_24h ?? 0)} icon={Activity} />
+				<StatCard title="Uptime (7d)" value={formatUptime(stats?.uptime_percent_7d ?? 0)} icon={Activity} />
+				<StatCard title="Uptime (30d)" value={formatUptime(stats?.uptime_percent_30d ?? 0)} icon={Activity} />
 				<StatCard
 					title="Avg Response"
-					value={uptimeStats ? `${uptimeStats.avgResponse}ms` : "-"}
-					subtitle={`${uptimeStats?.totalChecks || 0} checks`}
+					value={
+						stats?.avg_ping_24h
+							? `${Math.round(stats.avg_ping_24h)}ms`
+							: uptimeStats
+								? `${uptimeStats.avgResponse}ms`
+								: "-"
+					}
+					subtitle={`${stats?.uptime_24h?.total ?? uptimeStats?.totalChecks ?? 0} checks`}
 					icon={Clock}
 				/>
 			</div>
@@ -429,11 +447,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 									</defs>
 									<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
 									<XAxis dataKey="time" tick={{ fontSize: 12 }} />
-									<YAxis
-										yAxisId="left"
-										tick={{ fontSize: 12 }}
-										unit="ms"
-									/>
+									<YAxis yAxisId="left" tick={{ fontSize: 12 }} unit="ms" />
 									<YAxis
 										yAxisId="right"
 										orientation="right"
@@ -457,17 +471,9 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 										fill="url(#colorResponse)"
 										name="Response Time (ms)"
 									/>
-									<Bar
-										yAxisId="right"
-										dataKey="status"
-										barSize={4}
-										name="Status"
-									>
+									<Bar yAxisId="right" dataKey="status" barSize={4} name="Status">
 										{chartData.map((entry, index) => (
-											<Cell
-												key={`cell-${index}`}
-												fill={entry.status === 1 ? "#22c55e" : "#ef4444"}
-											/>
+											<Cell key={`cell-${index}`} fill={entry.status === 1 ? "#22c55e" : "#ef4444"} />
 										))}
 									</Bar>
 								</ComposedChart>
@@ -521,7 +527,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 						{statusPages && statusPages.length > 0 ? (
 							<div className="space-y-2">
 								{statusPages.map((page) => {
-									const isLinked = monitor.status_pages?.includes(page.id) || false
+									const isLinked = linkedStatusPageMonitors?.some((link) => link.status_page_id === page.id) || false
 									return (
 										<div key={page.id} className="flex items-center justify-between py-1">
 											<span className="text-sm">{page.name}</span>
@@ -529,31 +535,22 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 												variant={isLinked ? "default" : "outline"}
 												size="sm"
 												onClick={() => {
-													const current = monitor.status_pages || []
-													const next = isLinked
-															? current.filter((sp) => sp !== page.id)
-															: [...current, page.id]
 													updateStatusPagesMutation.mutate({
-														id: monitor.id,
-														status_pages: next,
-													} as any)
+														pageId: page.id,
+														linked: isLinked,
+													})
 												}}
 											>
 												{isLinked ? "Linked" : "Link"}
 											</Button>
 										</div>
 									)
-									})}
-								</div>
-							) : (
-								<p className="text-sm text-muted-foreground">No status pages yet.</p>
-							)}
-						<Button
-							variant="outline"
-							size="sm"
-							className="w-full"
-							onClick={() => setIsCreateStatusPageOpen(true)}
-						>
+								})}
+							</div>
+						) : (
+							<p className="text-sm text-muted-foreground">No status pages yet.</p>
+						)}
+						<Button variant="outline" size="sm" className="w-full" onClick={() => setIsCreateStatusPageOpen(true)}>
 							Create Status Page
 						</Button>
 					</CardContent>
@@ -576,13 +573,11 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{heartbeats?.slice(0, 50).map((hb: any) => (
+							{heartbeats?.slice(0, 50).map((hb: HeartbeatRow) => (
 								<TableRow key={hb.id}>
 									<TableCell>{formatDate(hb.time || hb.timestamp)}</TableCell>
 									<TableCell>
-										<Badge variant={hb.status === "up" ? "default" : "destructive"}>
-											{hb.status}
-										</Badge>
+										<Badge variant={hb.status === "up" ? "default" : "destructive"}>{hb.status}</Badge>
 									</TableCell>
 									<TableCell>{formatPing(hb.ping)}</TableCell>
 									<TableCell className="max-w-xs truncate">{hb.msg || "-"}</TableCell>
@@ -606,9 +601,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 					<AlertDialogContent>
 						<AlertDialogHeader>
 							<AlertDialogTitle>Create Status Page</AlertDialogTitle>
-							<AlertDialogDescription>
-								Create a public status page for this monitor.
-							</AlertDialogDescription>
+							<AlertDialogDescription>Create a public status page for this monitor.</AlertDialogDescription>
 						</AlertDialogHeader>
 						<div className="grid gap-4 py-4">
 							<div className="grid gap-2">
@@ -642,12 +635,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 					</AlertDialogContent>
 				</AlertDialog>
 			)}
-			<AddMonitorDialog
-				open={isEditDialogOpen}
-				onOpenChange={setIsEditDialogOpen}
-				monitor={monitor}
-				isEdit
-			/>
+			<AddMonitorDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} monitor={monitor} isEdit />
 
 			<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
 				<AlertDialogContent>

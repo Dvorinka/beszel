@@ -3,29 +3,29 @@
 import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-	ChevronLeft,
-	ChevronRight,
-	Calendar as CalendarIcon,
-	AlertCircle,
-	Globe,
-	Shield,
-} from "lucide-react"
+import { Link } from "@/components/router"
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, AlertCircle, Globe, Shield } from "lucide-react"
 import { getCalendarEvents, type CalendarEvent } from "@/lib/incidents"
-import { formatDate } from "@/lib/domains"
 
 export function CalendarView() {
 	const [currentDate, setCurrentDate] = useState(new Date())
-
-	const { data: events, isLoading } = useQuery({
-		queryKey: ["calendar-events"],
-		queryFn: getCalendarEvents,
-	})
-
 	const year = currentDate.getFullYear()
 	const month = currentDate.getMonth()
+
+	const queryRange = useMemo(() => {
+		const from = new Date(year, month, 1)
+		const to = new Date(year, month + 13, 0)
+		return {
+			from: toDateString(from),
+			to: toDateString(to),
+		}
+	}, [year, month])
+
+	const { data: events, isLoading } = useQuery({
+		queryKey: ["calendar-events", queryRange.from, queryRange.to],
+		queryFn: () => getCalendarEvents(queryRange),
+	})
 
 	const daysInMonth = useMemo(() => {
 		return new Date(year, month + 1, 0).getDate()
@@ -37,21 +37,29 @@ export function CalendarView() {
 
 	const days = useMemo(() => {
 		const d: { day: number; events: CalendarEvent[] }[] = []
-		
+
 		// Empty cells for days before start of month
 		for (let i = 0; i < firstDayOfMonth; i++) {
 			d.push({ day: 0, events: [] })
 		}
-		
+
 		// Days of month
 		for (let day = 1; day <= daysInMonth; day++) {
 			const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 			const dayEvents = events?.filter((e) => e.date === dateStr) || []
 			d.push({ day, events: dayEvents })
 		}
-		
+
 		return d
 	}, [year, month, daysInMonth, firstDayOfMonth, events])
+
+	const upcomingEvents = useMemo(() => {
+		const today = toDateString(new Date())
+		return (events || [])
+			.filter((event) => event.date >= today)
+			.sort((a, b) => a.date.localeCompare(b.date))
+			.slice(0, 8)
+	}, [events])
 
 	const prevMonth = () => {
 		setCurrentDate(new Date(year, month - 1, 1))
@@ -75,8 +83,18 @@ export function CalendarView() {
 	}
 
 	const monthNames = [
-		"January", "February", "March", "April", "May", "June",
-		"July", "August", "September", "October", "November", "December"
+		"January",
+		"February",
+		"March",
+		"April",
+		"May",
+		"June",
+		"July",
+		"August",
+		"September",
+		"October",
+		"November",
+		"December",
 	]
 
 	if (isLoading) {
@@ -130,30 +148,66 @@ export function CalendarView() {
 					{days.map((day, index) => (
 						<div
 							key={index}
-							className={`min-h-[100px] border rounded-lg p-2 ${
-								day.day === 0 ? "bg-muted/30" : "bg-card"
-							}`}
+							className={`min-h-[100px] border rounded-lg p-2 ${day.day === 0 ? "bg-muted/30" : "bg-card"}`}
 						>
 							{day.day > 0 && (
 								<>
 									<div className="font-medium text-sm mb-1">{day.day}</div>
 									<div className="space-y-1">
 										{day.events.map((event) => (
-											<div
+											<Link
 												key={event.id}
+												href={event.link || "/calendar"}
 												className="text-xs p-1 rounded flex items-center gap-1"
-												style={{ backgroundColor: event.color + "20", color: event.color }}
+												style={{ backgroundColor: `${event.color}20`, color: event.color }}
 												title={event.title}
 											>
 												{getEventIcon(event.type)}
 												<span className="truncate">{event.title}</span>
-											</div>
+											</Link>
 										))}
 									</div>
 								</>
 							)}
 						</div>
 					))}
+				</div>
+				<div className="mt-6 border-t pt-4">
+					<div className="mb-3 flex items-center justify-between">
+						<h3 className="text-sm font-semibold">Upcoming</h3>
+						<span className="text-xs text-muted-foreground">Next 12 months from this view</span>
+					</div>
+					{upcomingEvents.length > 0 ? (
+						<div className="grid gap-2 sm:grid-cols-2">
+							{upcomingEvents.map((event) => (
+								<Link
+									key={event.id}
+									href={event.link || "/calendar"}
+									className="flex items-center gap-3 rounded-md border p-3 text-sm hover:bg-muted/50"
+								>
+									<div
+										className="flex h-8 w-8 shrink-0 items-center justify-center rounded"
+										style={{ backgroundColor: `${event.color}20`, color: event.color }}
+									>
+										{getEventIcon(event.type)}
+									</div>
+									<div className="min-w-0 flex-1">
+										<div className="truncate font-medium">{event.title}</div>
+										<div className="text-xs text-muted-foreground">{event.date}</div>
+									</div>
+									{typeof event.days_until === "number" && (
+										<div className="text-xs text-muted-foreground">
+											{event.days_until === 0 ? "Today" : `${event.days_until}d`}
+										</div>
+									)}
+								</Link>
+							))}
+						</div>
+					) : (
+						<div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+							No upcoming domain, SSL, or incident events found.
+						</div>
+					)}
 				</div>
 				<div className="mt-4 flex flex-wrap gap-4 text-sm">
 					<div className="flex items-center gap-2">
@@ -176,4 +230,8 @@ export function CalendarView() {
 			</CardContent>
 		</Card>
 	)
+}
+
+function toDateString(date: Date) {
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
 }

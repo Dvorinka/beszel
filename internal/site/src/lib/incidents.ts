@@ -4,7 +4,14 @@ export interface Incident {
 	id: string
 	title: string
 	description?: string
-	type: "monitor_down" | "monitor_up" | "domain_expiring" | "domain_expired" | "ssl_expiring" | "system_offline" | "system_online"
+	type:
+		| "monitor_down"
+		| "monitor_up"
+		| "domain_expiring"
+		| "domain_expired"
+		| "ssl_expiring"
+		| "system_offline"
+		| "system_online"
 	severity: "critical" | "high" | "medium" | "low"
 	status: "open" | "acknowledged" | "resolved" | "closed"
 	monitor?: string
@@ -45,6 +52,12 @@ export interface CalendarEvent {
 	date: string
 	type: "domain_expiry" | "ssl_expiry" | "incident"
 	color: string
+	link?: string
+	entity_id?: string
+	entity_name?: string
+	domain_id?: string
+	incident_id?: string
+	days_until?: number
 }
 
 export interface CreateIncidentRequest {
@@ -68,7 +81,7 @@ export async function getIncidents(filters?: { status?: string; severity?: strin
 	const params = new URLSearchParams()
 	if (filters?.status) params.set("status", filters.status)
 	if (filters?.severity) params.set("severity", filters.severity)
-	
+
 	const response = await fetch(`${API_BASE}?${params}`, {
 		headers: { Authorization: `Bearer ${pb.authStore.token}` },
 	})
@@ -156,8 +169,12 @@ export async function getIncidentStats(): Promise<IncidentStats> {
 	return response.json()
 }
 
-export async function getCalendarEvents(): Promise<CalendarEvent[]> {
-	const response = await fetch(`${API_BASE}/calendar`, {
+export async function getCalendarEvents(range?: { from?: string; to?: string }): Promise<CalendarEvent[]> {
+	const params = new URLSearchParams()
+	if (range?.from) params.set("from", range.from)
+	if (range?.to) params.set("to", range.to)
+	const query = params.toString()
+	const response = await fetch(`${API_BASE}/calendar${query ? `?${query}` : ""}`, {
 		headers: { Authorization: `Bearer ${pb.authStore.token}` },
 	})
 	if (!response.ok) throw new Error(`Failed to fetch calendar: ${response.statusText}`)
@@ -166,21 +183,31 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
 
 export function getSeverityColor(severity: string): string {
 	switch (severity) {
-		case "critical": return "bg-red-600"
-		case "high": return "bg-orange-500"
-		case "medium": return "bg-yellow-500"
-		case "low": return "bg-blue-500"
-		default: return "bg-gray-500"
+		case "critical":
+			return "bg-red-600"
+		case "high":
+			return "bg-orange-500"
+		case "medium":
+			return "bg-yellow-500"
+		case "low":
+			return "bg-blue-500"
+		default:
+			return "bg-gray-500"
 	}
 }
 
 export function getStatusColor(status: string): string {
 	switch (status) {
-		case "open": return "bg-red-500"
-		case "acknowledged": return "bg-yellow-500"
-		case "resolved": return "bg-green-500"
-		case "closed": return "bg-gray-500"
-		default: return "bg-gray-500"
+		case "open":
+			return "bg-red-500"
+		case "acknowledged":
+			return "bg-yellow-500"
+		case "resolved":
+			return "bg-green-500"
+		case "closed":
+			return "bg-gray-500"
+		default:
+			return "bg-gray-500"
 	}
 }
 
@@ -188,10 +215,10 @@ export function formatDuration(startedAt: string): string {
 	const start = new Date(startedAt)
 	const now = new Date()
 	const diff = now.getTime() - start.getTime()
-	
+
 	const hours = Math.floor(diff / (1000 * 60 * 60))
 	const days = Math.floor(hours / 24)
-	
+
 	if (days > 0) return `${days}d ${hours % 24}h`
 	if (hours > 0) return `${hours}h`
 	return "< 1h"

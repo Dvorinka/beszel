@@ -426,13 +426,17 @@ func (h *APIHandler) getCalendarEvents(e *core.RequestEvent) error {
 	}
 
 	events := []map[string]interface{}{}
+	from, to := calendarRange(e)
 
 	// Domain expirations
 	domains, _ := h.app.FindAllRecords("domains",
-		dbx.NewExp("user = {:user} && expiry_date != ''", dbx.Params{"user": authRecord.Id}),
+		dbx.NewExp("user = {:user}", dbx.Params{"user": authRecord.Id}),
 	)
 	for _, d := range domains {
 		expiryDate := d.GetDateTime("expiry_date").Time()
+		if expiryDate.IsZero() || !dateInRange(expiryDate, from, to) {
+			continue
+		}
 		domainName := d.GetString("domain_name")
 		daysUntil := int(expiryDate.Sub(time.Now()).Hours() / 24)
 
@@ -446,18 +450,23 @@ func (h *APIHandler) getCalendarEvents(e *core.RequestEvent) error {
 		}
 
 		events = append(events, map[string]interface{}{
-			"id":    "domain-" + d.Id,
-			"title": "🌐 " + domainName + " expires",
-			"date":  expiryDate.Format("2006-01-02"),
-			"type":  "domain_expiry",
-			"color": color,
+			"id":          "domain-" + d.Id,
+			"title":       domainName + " expires",
+			"date":        expiryDate.Format("2006-01-02"),
+			"type":        "domain_expiry",
+			"color":       color,
+			"domain_id":   d.Id,
+			"entity_id":   d.Id,
+			"entity_name": domainName,
+			"link":        "/domain/" + d.Id,
+			"days_until":  daysUntil,
 		})
 	}
 
 	// SSL expirations
 	for _, d := range domains {
 		sslExpiry := d.GetDateTime("ssl_valid_to").Time()
-		if sslExpiry.IsZero() {
+		if sslExpiry.IsZero() || !dateInRange(sslExpiry, from, to) {
 			continue
 		}
 		domainName := d.GetString("domain_name")
@@ -473,11 +482,16 @@ func (h *APIHandler) getCalendarEvents(e *core.RequestEvent) error {
 		}
 
 		events = append(events, map[string]interface{}{
-			"id":    "ssl-" + d.Id,
-			"title": "🔒 " + domainName + " SSL expires",
-			"date":  sslExpiry.Format("2006-01-02"),
-			"type":  "ssl_expiry",
-			"color": color,
+			"id":          "ssl-" + d.Id,
+			"title":       domainName + " SSL expires",
+			"date":        sslExpiry.Format("2006-01-02"),
+			"type":        "ssl_expiry",
+			"color":       color,
+			"domain_id":   d.Id,
+			"entity_id":   d.Id,
+			"entity_name": domainName,
+			"link":        "/domain/" + d.Id,
+			"days_until":  daysUntil,
 		})
 	}
 
@@ -487,6 +501,9 @@ func (h *APIHandler) getCalendarEvents(e *core.RequestEvent) error {
 	)
 	for _, i := range incidents {
 		startedAt := i.GetDateTime("started_at").Time()
+		if startedAt.IsZero() || !dateInRange(startedAt, from, to) {
+			continue
+		}
 		title := i.GetString("title")
 		severity := i.GetString("severity")
 
@@ -501,15 +518,45 @@ func (h *APIHandler) getCalendarEvents(e *core.RequestEvent) error {
 		}
 
 		events = append(events, map[string]interface{}{
-			"id":    "incident-" + i.Id,
-			"title": "⚠️ " + title,
-			"date":  startedAt.Format("2006-01-02"),
-			"type":  "incident",
-			"color": color,
+			"id":          "incident-" + i.Id,
+			"title":       title,
+			"date":        startedAt.Format("2006-01-02"),
+			"type":        "incident",
+			"color":       color,
+			"incident_id": i.Id,
+			"entity_id":   i.Id,
+			"entity_name": title,
+			"link":        "/incidents",
 		})
 	}
 
 	return e.JSON(http.StatusOK, events)
+}
+
+func calendarRange(e *core.RequestEvent) (*time.Time, *time.Time) {
+	var from, to *time.Time
+	if value := e.Request.URL.Query().Get("from"); value != "" {
+		if parsed, err := time.Parse("2006-01-02", value); err == nil {
+			from = &parsed
+		}
+	}
+	if value := e.Request.URL.Query().Get("to"); value != "" {
+		if parsed, err := time.Parse("2006-01-02", value); err == nil {
+			end := parsed.Add(24*time.Hour - time.Nanosecond)
+			to = &end
+		}
+	}
+	return from, to
+}
+
+func dateInRange(value time.Time, from, to *time.Time) bool {
+	if from != nil && value.Before(*from) {
+		return false
+	}
+	if to != nil && value.After(*to) {
+		return false
+	}
+	return true
 }
 
 // addUpdate adds an update record

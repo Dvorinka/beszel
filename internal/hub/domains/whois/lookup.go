@@ -2,8 +2,11 @@ package whois
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -706,35 +709,32 @@ func (s *LookupService) lookupSSL(ctx context.Context, domainName string, d *dom
 		d.SSLValidTo = &cert.NotAfter
 		d.SSLSubject = cert.Subject.CommonName
 
-		// Format fingerprint as colon-separated hex
-		if len(cert.Signature) > 0 {
-			fingerprint := fmt.Sprintf("%X", cert.Signature)
-			// Add colons every 2 characters for standard format
-			if len(fingerprint) > 2 {
-				var formatted []string
-				for i := 0; i < len(fingerprint); i += 2 {
-					if i+2 <= len(fingerprint) {
-						formatted = append(formatted, fingerprint[i:i+2])
-					}
-				}
-				d.SSLFingerprint = strings.Join(formatted, ":")
-			} else {
-				d.SSLFingerprint = fingerprint
-			}
-		}
+		fingerprint := sha256.Sum256(cert.Raw)
+		d.SSLFingerprint = strings.ToUpper(strings.Join(splitHex(hex.EncodeToString(fingerprint[:])), ":"))
 
-		// Extract signature algorithm
 		d.SSLSignatureAlgo = cert.SignatureAlgorithm.String()
 
-		// Safely extract key size for different key types
 		switch key := cert.PublicKey.(type) {
 		case *rsa.PublicKey:
 			d.SSLKeySize = key.N.BitLen()
+		case *ecdsa.PublicKey:
+			d.SSLKeySize = key.Curve.Params().BitSize
 		default:
-			// For ECC keys, try to determine from curve
-			d.SSLKeySize = 256 // Default for ECC
+			d.SSLKeySize = 0
 		}
 	}
+}
+
+func splitHex(value string) []string {
+	parts := make([]string, 0, len(value)/2)
+	for i := 0; i < len(value); i += 2 {
+		end := i + 2
+		if end > len(value) {
+			end = len(value)
+		}
+		parts = append(parts, value[i:end])
+	}
+	return parts
 }
 
 // lookupHost fetches host/geolocation info

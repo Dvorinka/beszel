@@ -26,6 +26,7 @@ type Scheduler struct {
 	stopChan      chan struct{}
 	wg            sync.WaitGroup
 	alertCallback AlertCallback
+	limit         chan struct{}
 }
 
 // NewScheduler creates a new domain scheduler
@@ -34,6 +35,7 @@ func NewScheduler(app core.App) *Scheduler {
 		app:      app,
 		whois:    whois.NewLookupService(""), // API key can be configured via env
 		stopChan: make(chan struct{}),
+		limit:    make(chan struct{}, 4),
 	}
 }
 
@@ -92,13 +94,15 @@ func (s *Scheduler) checkDomains() {
 		s.wg.Add(1)
 		go func(r *core.Record) {
 			defer s.wg.Done()
+			s.limit <- struct{}{}
+			defer func() { <-s.limit }()
 			s.checkDomain(r)
 		}(record)
 	}
 }
 
 // checkDomain checks a single domain
-func (s *Scheduler) checkDomain(record *core.Record) {
+func (s *Scheduler) checkDomain(record *core.Record) error {
 	domainName := record.GetString("domain_name")
 
 	userID := record.GetString("user")
@@ -112,11 +116,10 @@ func (s *Scheduler) checkDomain(record *core.Record) {
 	newData, err := s.whois.LookupDomain(ctx, domainName)
 	if err != nil {
 		log.Printf("[domain-scheduler] Failed to lookup %s: %v", domainName, err)
-		return
+		return err
 	}
 
-	// Track changes
-	history := s.trackChanges(record, newData)
+	oldRecord := record.Fresh()
 
 	// Update record (only overwrite if new data is present to preserve valid data on partial lookups)
 	if newData.ExpiryDate != nil {
@@ -136,6 +139,9 @@ func (s *Scheduler) checkDomain(record *core.Record) {
 	}
 	if newData.RegistrarURL != "" {
 		record.Set("registrar_url", newData.RegistrarURL)
+	}
+	if newData.RegistryDomainID != "" {
+		record.Set("registry_domain_id", newData.RegistryDomainID)
 	}
 	record.Set("dnssec", newData.DNSSEC)
 	if len(newData.NameServers) > 0 {
@@ -179,8 +185,57 @@ func (s *Scheduler) checkDomain(record *core.Record) {
 	if newData.SSLSignatureAlgo != "" {
 		record.Set("ssl_signature_algo", newData.SSLSignatureAlgo)
 	}
-	record.Set("host_country", newData.HostCountry)
-	record.Set("host_isp", newData.HostISP)
+	if newData.HostCountry != "" {
+		record.Set("host_country", newData.HostCountry)
+	}
+	if newData.HostRegion != "" {
+		record.Set("host_region", newData.HostRegion)
+	}
+	if newData.HostCity != "" {
+		record.Set("host_city", newData.HostCity)
+	}
+	if newData.HostISP != "" {
+		record.Set("host_isp", newData.HostISP)
+	}
+	if newData.HostOrg != "" {
+		record.Set("host_org", newData.HostOrg)
+	}
+	if newData.HostAS != "" {
+		record.Set("host_as", newData.HostAS)
+	}
+	if newData.HostLat != 0 {
+		record.Set("host_lat", newData.HostLat)
+	}
+	if newData.HostLon != 0 {
+		record.Set("host_lon", newData.HostLon)
+	}
+	if newData.RegistrantName != "" {
+		record.Set("registrant_name", newData.RegistrantName)
+	}
+	if newData.RegistrantOrg != "" {
+		record.Set("registrant_org", newData.RegistrantOrg)
+	}
+	if newData.RegistrantStreet != "" {
+		record.Set("registrant_street", newData.RegistrantStreet)
+	}
+	if newData.RegistrantCity != "" {
+		record.Set("registrant_city", newData.RegistrantCity)
+	}
+	if newData.RegistrantState != "" {
+		record.Set("registrant_state", newData.RegistrantState)
+	}
+	if newData.RegistrantCountry != "" {
+		record.Set("registrant_country", newData.RegistrantCountry)
+	}
+	if newData.RegistrantPostal != "" {
+		record.Set("registrant_postal", newData.RegistrantPostal)
+	}
+	if newData.AbuseEmail != "" {
+		record.Set("abuse_email", newData.AbuseEmail)
+	}
+	if newData.AbusePhone != "" {
+		record.Set("abuse_phone", newData.AbusePhone)
+	}
 	record.Set("last_checked", time.Now())
 
 	// Update status - fallback to existing record expiry if new lookup didn't return one
@@ -212,9 +267,11 @@ func (s *Scheduler) checkDomain(record *core.Record) {
 	}
 	record.Set("status", status)
 
+	history := s.trackChanges(oldRecord, newData, status)
+
 	if err := s.app.Save(record); err != nil {
 		log.Printf("[domain-scheduler] Failed to update %s: %v", domainName, err)
-		return
+		return err
 	}
 
 	// Save history entries
@@ -239,6 +296,7 @@ func (s *Scheduler) checkDomain(record *core.Record) {
 	s.discoverSubdomains(record, domainName, userID)
 
 	log.Printf("[domain-scheduler] Updated domain: %s (status: %s)", domainName, status)
+	return nil
 }
 
 // discoverSubdomains discovers and saves subdomains for a domain
@@ -297,9 +355,10 @@ func (s *Scheduler) discoverSubdomains(record *core.Record, domainName, userID s
 }
 
 // trackChanges compares old and new data and returns history entries
-func (s *Scheduler) trackChanges(oldRecord *core.Record, newData *domain.Domain) []domain.DomainHistory {
+func (s *Scheduler) trackChanges(oldRecord *core.Record, newData *domain.Domain, finalStatus string) []domain.DomainHistory {
 	var history []domain.DomainHistory
 	now := time.Now()
+	hasPreviousCheck := !oldRecord.GetDateTime("last_checked").IsZero()
 
 	// Check expiry date change
 	oldExpiry := oldRecord.GetDateTime("expiry_date").Time()
@@ -327,13 +386,12 @@ func (s *Scheduler) trackChanges(oldRecord *core.Record, newData *domain.Domain)
 
 	// Check status change
 	oldStatus := oldRecord.GetString("status")
-	newStatus := newData.GetStatus()
-	if newStatus != oldStatus {
+	if hasPreviousCheck && finalStatus != oldStatus {
 		history = append(history, domain.DomainHistory{
 			ChangeType: domain.ChangeTypeStatus,
 			FieldName:  "status",
 			OldValue:   oldStatus,
-			NewValue:   newStatus,
+			NewValue:   finalStatus,
 			CreatedAt:  now,
 		})
 	}
@@ -429,13 +487,9 @@ func (s *Scheduler) RefreshDomain(domainID string) error {
 		return err
 	}
 
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		s.checkDomain(record)
-	}()
-
-	return nil
+	s.limit <- struct{}{}
+	defer func() { <-s.limit }()
+	return s.checkDomain(record)
 }
 
 // CheckAllDomains manually triggers a check of all active domains

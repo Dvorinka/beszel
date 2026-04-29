@@ -17,14 +17,12 @@ import {
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual"
 import {
 	ArrowDownIcon,
+	ArrowUpDownIcon,
 	ArrowUpIcon,
 	EyeIcon,
 	FilterIcon,
 	LayoutGridIcon,
 	LayoutListIcon,
-	PauseIcon,
-	PlusIcon,
-	ServerIcon,
 	Settings2Icon,
 	XIcon,
 } from "lucide-react"
@@ -34,6 +32,7 @@ import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
+	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
@@ -47,7 +46,6 @@ import { $downSystems, $pausedSystems, $systems, $upSystems } from "@/lib/stores
 import { cn, runOnce, useBrowserStorage } from "@/lib/utils"
 import type { SystemRecord } from "@/types"
 import AlertButton from "../alerts/alert-button"
-import { AddSystemDialog } from "../add-system"
 import { $router, Link } from "../router"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { SystemsTableColumns, ActionsButton, IndicatorDot } from "./systems-table-columns"
@@ -72,7 +70,6 @@ export default function SystemsTable() {
 	)
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 	const [columnVisibility, setColumnVisibility] = useBrowserStorage<VisibilityState>("cols", {})
-	const [addSystemDialogOpen, setAddSystemDialogOpen] = useState(false)
 
 	const locale = i18n.locale
 
@@ -137,45 +134,18 @@ export default function SystemsTable() {
 
 	const CardHead = useMemo(() => {
 		return (
-			<CardHeader className="p-0 pb-5">
-				<div className="flex flex-col gap-4">
-					{/* Title row */}
-					<div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-						<div className="flex-1">
-							<CardTitle className="text-xl mb-2 flex items-center gap-2">
-								<ServerIcon className="h-5 w-5 text-primary" />
-								<Trans>All Systems</Trans>
-							</CardTitle>
-							<CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
-								<Trans>Click on a system to view more information.</Trans>
-								<span className="text-xs text-muted-foreground">
-									({upSystemsLength} <ArrowUpIcon className="inline h-3 w-3 text-green-500" />
-									{downSystemsLength > 0 && (
-										<>
-											{" "}
-											{downSystemsLength}{" "}
-											<ArrowDownIcon className="inline h-3 w-3 text-red-500" />
-										</>
-									)}
-									{pausedSystemsLength > 0 && (
-										<>
-											{" "}
-											{pausedSystemsLength}{" "}
-											<PauseIcon className="inline h-3 w-3 text-gray-400" />
-										</>
-									)}
-									/ {data.length})
-								</span>
-							</CardDescription>
-						</div>
-						<Button variant="outline" onClick={() => setAddSystemDialogOpen(true)} className="shrink-0">
-							<PlusIcon className="mr-2 h-4 w-4" />
-							<Trans>Add System</Trans>
-						</Button>
+			<CardHeader className="p-0 mb-3 sm:mb-4">
+				<div className="grid md:flex gap-x-5 gap-y-3 w-full items-end">
+					<div className="px-2 sm:px-1">
+						<CardTitle className="mb-2">
+							<Trans>All Systems</Trans>
+						</CardTitle>
+						<CardDescription className="flex">
+							<Trans>Click on a system to view more information.</Trans>
+						</CardDescription>
 					</div>
 
-					{/* Filter row */}
-					<div className="flex flex-col sm:flex-row gap-2">
+					<div className="flex gap-2 ms-auto w-full md:w-80">
 						<div className="relative flex-1">
 							<Input
 								placeholder={t`Filter...`}
@@ -203,61 +173,116 @@ export default function SystemsTable() {
 									<Trans>View</Trans>
 								</Button>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="min-w-48">
-								{/* Layout */}
-								<DropdownMenuLabel className="flex items-center gap-2">
-									<LayoutGridIcon className="size-4" />
-									<Trans>Layout</Trans>
-								</DropdownMenuLabel>
-								<DropdownMenuRadioGroup value={viewMode} onValueChange={(view) => setViewMode(view as ViewMode)}>
-									<DropdownMenuRadioItem value="table" className="gap-2">
-										<LayoutListIcon className="size-4" />
-										<Trans>Table</Trans>
-									</DropdownMenuRadioItem>
-									<DropdownMenuRadioItem value="grid" className="gap-2">
-										<LayoutGridIcon className="size-4" />
-										<Trans>Grid</Trans>
-									</DropdownMenuRadioItem>
-								</DropdownMenuRadioGroup>
-								<DropdownMenuSeparator />
+							<DropdownMenuContent align="end" className="h-72 md:h-auto min-w-48 md:min-w-auto overflow-y-auto">
+								<div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-s md:divide-y-0">
+									<div className="border-r">
+										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+											<LayoutGridIcon className="size-4" />
+											<Trans>Layout</Trans>
+										</DropdownMenuLabel>
+										<DropdownMenuSeparator />
+										<DropdownMenuRadioGroup
+											className="px-1 pb-1"
+											value={viewMode}
+											onValueChange={(view) => setViewMode(view as ViewMode)}
+										>
+											<DropdownMenuRadioItem value="table" onSelect={(e) => e.preventDefault()} className="gap-2">
+												<LayoutListIcon className="size-4" />
+												<Trans>Table</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="grid" onSelect={(e) => e.preventDefault()} className="gap-2">
+												<LayoutGridIcon className="size-4" />
+												<Trans>Grid</Trans>
+											</DropdownMenuRadioItem>
+										</DropdownMenuRadioGroup>
+									</div>
 
-								{/* Status */}
-								<DropdownMenuLabel className="flex items-center gap-2">
-									<FilterIcon className="size-4" />
-									<Trans>Status</Trans>
-								</DropdownMenuLabel>
-								<DropdownMenuRadioGroup value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
-									<DropdownMenuRadioItem value="all">
-										<Trans>All ({data.length})</Trans>
-									</DropdownMenuRadioItem>
-									<DropdownMenuRadioItem value="up">
-										<Trans>Up ({upSystemsLength})</Trans>
-									</DropdownMenuRadioItem>
-									<DropdownMenuRadioItem value="down">
-										<Trans>Down ({downSystemsLength})</Trans>
-									</DropdownMenuRadioItem>
-									<DropdownMenuRadioItem value="paused">
-										<Trans>Paused ({pausedSystemsLength})</Trans>
-									</DropdownMenuRadioItem>
-								</DropdownMenuRadioGroup>
-								<DropdownMenuSeparator />
+									<div className="border-r">
+										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+											<FilterIcon className="size-4" />
+											<Trans>Status</Trans>
+										</DropdownMenuLabel>
+										<DropdownMenuSeparator />
+										<DropdownMenuRadioGroup
+											className="px-1 pb-1"
+											value={statusFilter}
+											onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+										>
+											<DropdownMenuRadioItem value="all" onSelect={(e) => e.preventDefault()}>
+												<Trans>All Systems</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="up" onSelect={(e) => e.preventDefault()}>
+												<Trans>Up ({upSystemsLength})</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="down" onSelect={(e) => e.preventDefault()}>
+												<Trans>Down ({downSystemsLength})</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="paused" onSelect={(e) => e.preventDefault()}>
+												<Trans>Paused ({pausedSystemsLength})</Trans>
+											</DropdownMenuRadioItem>
+										</DropdownMenuRadioGroup>
+									</div>
 
-								{/* Columns */}
-								<DropdownMenuLabel className="flex items-center gap-2">
-									<EyeIcon className="size-4" />
-									<Trans>Columns</Trans>
-								</DropdownMenuLabel>
-								{columns.map((column) => (
-									<DropdownMenuCheckboxItem
-										key={column.id}
-										checked={column.getIsVisible()}
-										onCheckedChange={(value) => column.toggleVisibility(!!value)}
-										onSelect={(e) => e.preventDefault()}
-										className="gap-2"
-									>
-										{column.columnDef.header?.toString() ?? column.id}
-									</DropdownMenuCheckboxItem>
-								))}
+									<div className="border-r">
+										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+											<ArrowUpDownIcon className="size-4" />
+											<Trans>Sort By</Trans>
+										</DropdownMenuLabel>
+										<DropdownMenuSeparator />
+										<div className="px-1 pb-1">
+											{columns.map((column) => {
+												if (!column.getCanSort()) return null
+												let Icon = <span className="w-6"></span>
+												// if current sort column, show sort direction
+												if (sorting[0]?.id === column.id) {
+													if (sorting[0]?.desc) {
+														Icon = <ArrowUpIcon className="me-2 size-4" />
+													} else {
+														Icon = <ArrowDownIcon className="me-2 size-4" />
+													}
+												}
+												return (
+													<DropdownMenuItem
+														onSelect={(e) => {
+															e.preventDefault()
+															setSorting([{ id: column.id, desc: sorting[0]?.id === column.id && !sorting[0]?.desc }])
+														}}
+														key={column.id}
+													>
+														{Icon}
+														{/* @ts-ignore */}
+														{column.columnDef.name()}
+													</DropdownMenuItem>
+												)
+											})}
+										</div>
+									</div>
+
+									<div>
+										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+											<EyeIcon className="size-4" />
+											<Trans>Visible Fields</Trans>
+										</DropdownMenuLabel>
+										<DropdownMenuSeparator />
+										<div className="px-1.5 pb-1">
+											{columns
+												.filter((column) => column.getCanHide())
+												.map((column) => {
+													return (
+														<DropdownMenuCheckboxItem
+															key={column.id}
+															onSelect={(e) => e.preventDefault()}
+															checked={column.getIsVisible()}
+															onCheckedChange={(value) => column.toggleVisibility(!!value)}
+														>
+															{/* @ts-ignore */}
+															{column.columnDef.name()}
+														</DropdownMenuCheckboxItem>
+													)
+												})}
+										</div>
+									</div>
+								</div>
 							</DropdownMenuContent>
 						</DropdownMenu>
 					</div>
@@ -273,37 +298,32 @@ export default function SystemsTable() {
 		upSystemsLength,
 		downSystemsLength,
 		pausedSystemsLength,
-		data.length,
 		filter,
-		setAddSystemDialogOpen,
 	])
 
 	return (
-		<>
-			<Card className="w-full px-3 py-5 sm:py-6 sm:px-6">
-				{CardHead}
-				{viewMode === "table" ? (
-					// table layout
-					<div className="rounded-md">
-						<AllSystemsTable table={table} rows={rows} colLength={visibleColumns.length} />
-					</div>
-				) : (
-					// grid layout
-					<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-						{rows?.length ? (
-							rows.map((row) => {
-								return <SystemCard key={row.original.id} row={row} table={table} colLength={visibleColumns.length} />
-							})
-						) : (
-							<div className="col-span-full text-center py-8">
-								<Trans>No systems found.</Trans>
-							</div>
-						)}
-					</div>
-				)}
-			</Card>
-			<AddSystemDialog open={addSystemDialogOpen} setOpen={setAddSystemDialogOpen} />
-		</>
+		<Card className="w-full px-3 py-5 sm:py-6 sm:px-6">
+			{CardHead}
+			{viewMode === "table" ? (
+				// table layout
+				<div className="rounded-md">
+					<AllSystemsTable table={table} rows={rows} colLength={visibleColumns.length} />
+				</div>
+			) : (
+				// grid layout
+				<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+					{rows?.length ? (
+						rows.map((row) => {
+							return <SystemCard key={row.original.id} row={row} table={table} colLength={visibleColumns.length} />
+						})
+					) : (
+						<div className="col-span-full text-center py-8">
+							<Trans>No systems found.</Trans>
+						</div>
+					)}
+				</div>
+			)}
+		</Card>
 	)
 }
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/henrygd/beszel/internal/entities/monitor"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -408,11 +409,25 @@ func (h *APIHandler) manualCheck(e *core.RequestEvent) error {
 		return e.InternalServerError("Check failed", err)
 	}
 
-	return e.JSON(http.StatusOK, map[string]interface{}{
+	response := map[string]interface{}{
 		"status": result.Status,
 		"ping":   result.Ping,
 		"msg":    result.Msg,
-	})
+	}
+
+	if hbs, err := h.app.FindRecordsByFilter(
+		"monitor_heartbeats",
+		"monitor = {:monitorId}",
+		"-time",
+		1,
+		0,
+		dbx.Params{"monitorId": id},
+	); err == nil && len(hbs) > 0 {
+		response["heartbeat_id"] = hbs[0].Id
+		response["time"] = hbs[0].GetDateTime("time").String()
+	}
+
+	return e.JSON(http.StatusOK, response)
 }
 
 // pauseMonitor pauses a monitor
@@ -493,11 +508,37 @@ func (h *APIHandler) getStats(e *core.RequestEvent) error {
 	stats24h, _ := h.scheduler.GetUptimeStats(id, 24)
 	stats7d, _ := h.scheduler.GetUptimeStats(id, 168)
 	stats30d, _ := h.scheduler.GetUptimeStats(id, 720)
+	avg24h := 0.0
+	if stats24h.Total > 0 {
+		records, _ := h.app.FindRecordsByFilter(
+			"monitor_heartbeats",
+			"monitor = {:monitorId} && time >= {:since} && status = {:status}",
+			"-time",
+			0,
+			0,
+			dbx.Params{
+				"monitorId": id,
+				"since":     time.Now().Add(-24 * time.Hour).Format("2006-01-02 15:04:05"),
+				"status":    string(monitor.StatusUp),
+			},
+		)
+		if len(records) > 0 {
+			totalPing := 0
+			for _, record := range records {
+				totalPing += record.GetInt("ping")
+			}
+			avg24h = float64(totalPing) / float64(len(records))
+		}
+	}
 
 	return e.JSON(http.StatusOK, map[string]interface{}{
-		"uptime_24h": stats24h,
-		"uptime_7d":  stats7d,
-		"uptime_30d": stats30d,
+		"uptime_24h":         stats24h,
+		"uptime_7d":          stats7d,
+		"uptime_30d":         stats30d,
+		"uptime_percent_24h": percent(stats24h),
+		"uptime_percent_7d":  percent(stats7d),
+		"uptime_percent_30d": percent(stats30d),
+		"avg_ping_24h":       avg24h,
 	})
 }
 
@@ -582,16 +623,14 @@ func recordToResponse(record *core.Record) MonitorResponse {
 		Updated:                record.GetDateTime("updated").Time(),
 	}
 
-	// Handle last_check
-	if lc := record.Get("last_check"); lc != nil {
-		if t, ok := lc.(time.Time); ok {
-			resp.LastCheck = &t
-		}
+	if lc := record.GetDateTime("last_check"); !lc.IsZero() {
+		t := lc.Time()
+		resp.LastCheck = &t
 	}
 
-	// Handle uptime_stats
 	if stats := record.Get("uptime_stats"); stats != nil {
-		if s, ok := stats.(map[string]float64); ok {
+		var s map[string]float64
+		if raw, err := json.Marshal(stats); err == nil && json.Unmarshal(raw, &s) == nil {
 			resp.UptimeStats = s
 		}
 	}
@@ -604,4 +643,11 @@ func recordToResponse(record *core.Record) MonitorResponse {
 	}
 
 	return resp
+}
+
+func percent(stats *monitor.UptimeStats) float64 {
+	if stats == nil || stats.Total == 0 {
+		return 0
+	}
+	return float64(stats.Up) / float64(stats.Total) * 100
 }

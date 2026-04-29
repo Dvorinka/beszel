@@ -192,6 +192,8 @@ export interface CheckResult {
 	status: MonitorStatus
 	ping: number
 	msg: string
+	heartbeat_id?: string
+	time?: string
 }
 
 // API Functions
@@ -200,18 +202,18 @@ export async function listMonitors(): Promise<Monitor[]> {
 	return response.monitors
 }
 
-export async function getMonitor(id: string): Promise<Monitor> {
+export function getMonitor(id: string): Promise<Monitor> {
 	return pb.send<Monitor>(`/api/beszel/monitors/${id}`, {})
 }
 
-export async function createMonitor(data: CreateMonitorRequest): Promise<Monitor> {
+export function createMonitor(data: CreateMonitorRequest): Promise<Monitor> {
 	return pb.send<Monitor>("/api/beszel/monitors", {
 		method: "POST",
 		body: JSON.stringify(data),
 	})
 }
 
-export async function updateMonitor(id: string, data: UpdateMonitorRequest): Promise<Monitor> {
+export function updateMonitor(id: string, data: UpdateMonitorRequest): Promise<Monitor> {
 	return pb.send<Monitor>(`/api/beszel/monitors/${id}`, {
 		method: "PATCH",
 		body: JSON.stringify(data),
@@ -224,33 +226,37 @@ export async function deleteMonitor(id: string): Promise<void> {
 	})
 }
 
-export async function manualCheck(id: string): Promise<CheckResult> {
+export function manualCheck(id: string): Promise<CheckResult> {
 	return pb.send<CheckResult>(`/api/beszel/monitors/${id}/check`, {
 		method: "POST",
 	})
 }
 
-export async function pauseMonitor(id: string): Promise<Monitor> {
+export function pauseMonitor(id: string): Promise<Monitor> {
 	return pb.send<Monitor>(`/api/beszel/monitors/${id}/pause`, {
 		method: "POST",
 	})
 }
 
-export async function resumeMonitor(id: string): Promise<Monitor> {
+export function resumeMonitor(id: string): Promise<Monitor> {
 	return pb.send<Monitor>(`/api/beszel/monitors/${id}/resume`, {
 		method: "POST",
 	})
 }
 
-export async function getMonitorStats(id: string): Promise<{
+export function getMonitorStats(id: string): Promise<{
 	uptime_24h: UptimeStats
 	uptime_7d: UptimeStats
 	uptime_30d: UptimeStats
+	uptime_percent_24h: number
+	uptime_percent_7d: number
+	uptime_percent_30d: number
+	avg_ping_24h: number
 }> {
 	return pb.send(`/api/beszel/monitors/${id}/stats`, {})
 }
 
-export async function getMonitorHeartbeats(id: string): Promise<{ heartbeats: Heartbeat[] }> {
+export function getMonitorHeartbeats(id: string): Promise<{ heartbeats: Heartbeat[] }> {
 	return pb.send(`/api/beszel/monitors/${id}/heartbeats`, {})
 }
 

@@ -117,6 +117,12 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 		AutoRenew       bool     `json:"auto_renew"`
 		AlertDaysBefore int      `json:"alert_days_before"`
 		SSLAlertEnabled bool     `json:"ssl_alert_enabled"`
+		SSLAlertDays    int      `json:"ssl_alert_days"`
+		MonitorType     string   `json:"monitor_type"`
+		NotifyOnExpiry  bool     `json:"notify_on_expiry"`
+		NotifyOnSSL     bool     `json:"notify_on_ssl_expiry"`
+		NotifyOnDNS     bool     `json:"notify_on_dns_change"`
+		NotifyOnReg     bool     `json:"notify_on_registrar_change"`
 	}
 	if err := json.NewDecoder(e.Request.Body).Decode(&req); err != nil {
 		return e.BadRequestError("invalid request body", err)
@@ -159,6 +165,12 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 	record.Set("auto_renew", req.AutoRenew)
 	record.Set("alert_days_before", req.AlertDaysBefore)
 	record.Set("ssl_alert_enabled", req.SSLAlertEnabled)
+	record.Set("ssl_alert_days", req.SSLAlertDays)
+	record.Set("monitor_type", req.MonitorType)
+	record.Set("notify_on_expiry", req.NotifyOnExpiry)
+	record.Set("notify_on_ssl_expiry", req.NotifyOnSSL)
+	record.Set("notify_on_dns_change", req.NotifyOnDNS)
+	record.Set("notify_on_registrar_change", req.NotifyOnReg)
 	record.Set("user", authRecord.Id)
 
 	// Auto-lookup if requested
@@ -167,40 +179,7 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 		ctx := e.Request.Context()
 		domainData, err := lookupSvc.LookupDomain(ctx, domainName)
 		if err == nil && domainData != nil {
-			if domainData.ExpiryDate != nil {
-				record.Set("expiry_date", *domainData.ExpiryDate)
-			} else {
-				record.Set("expiry_date", "")
-			}
-			if domainData.CreationDate != nil {
-				record.Set("creation_date", *domainData.CreationDate)
-			} else {
-				record.Set("creation_date", "")
-			}
-			if domainData.UpdatedDate != nil {
-				record.Set("updated_date", *domainData.UpdatedDate)
-			} else {
-				record.Set("updated_date", "")
-			}
-			record.Set("registrar_name", domainData.RegistrarName)
-			record.Set("registrar_id", domainData.RegistrarID)
-			record.Set("registrar_url", domainData.RegistrarURL)
-			record.Set("dnssec", domainData.DNSSEC)
-			record.Set("name_servers", domainData.NameServers)
-			record.Set("mx_records", domainData.MXRecords)
-			record.Set("txt_records", domainData.TXTRecords)
-			record.Set("ipv4_addresses", domainData.IPv4Addresses)
-			record.Set("ipv6_addresses", domainData.IPv6Addresses)
-			record.Set("ssl_issuer", domainData.SSLIssuer)
-			if domainData.SSLValidTo != nil {
-				record.Set("ssl_valid_to", *domainData.SSLValidTo)
-			} else {
-				record.Set("ssl_valid_to", "")
-			}
-			record.Set("host_country", domainData.HostCountry)
-			record.Set("host_isp", domainData.HostISP)
-			record.Set("favicon_url", domainData.FaviconURL)
-			record.Set("last_checked", time.Now())
+			h.applyLookupData(record, domainData)
 		}
 	}
 
@@ -281,6 +260,23 @@ func (h *APIHandler) updateDomain(e *core.RequestEvent) error {
 	if sslAlert, ok := req["ssl_alert_enabled"]; ok {
 		record.Set("ssl_alert_enabled", sslAlert)
 	}
+	for _, field := range []string{
+		"ssl_alert_days",
+		"monitor_type",
+		"notify_on_expiry",
+		"notify_on_ssl_expiry",
+		"notify_on_dns_change",
+		"notify_on_registrar_change",
+		"notify_on_value_change",
+		"value_change_threshold",
+		"quiet_hours_enabled",
+		"quiet_hours_start",
+		"quiet_hours_end",
+	} {
+		if value, ok := req[field]; ok {
+			record.Set(field, value)
+		}
+	}
 
 	if err := h.app.Save(record); err != nil {
 		return e.InternalServerError("failed to update domain", err)
@@ -330,12 +326,18 @@ func (h *APIHandler) refreshDomain(e *core.RequestEvent) error {
 		return e.ForbiddenError("not authorized", nil)
 	}
 
-	// Trigger refresh via scheduler
 	if h.scheduler != nil {
-		h.scheduler.RefreshDomain(id)
+		if err := h.scheduler.RefreshDomain(id); err != nil {
+			return e.InternalServerError("failed to refresh domain", err)
+		}
 	}
 
-	return e.JSON(http.StatusOK, map[string]string{"status": "refreshing"})
+	updatedRecord, err := h.app.FindRecordById("domains", id)
+	if err != nil {
+		return e.InternalServerError("failed to fetch refreshed domain", err)
+	}
+
+	return e.JSON(http.StatusOK, h.recordToResponse(updatedRecord))
 }
 
 // getDomainHistory gets the change history for a domain
@@ -530,35 +532,65 @@ func (h *APIHandler) recordToResponse(record *core.Record) map[string]interface{
 	}
 
 	resp := map[string]interface{}{
-		"id":                 record.Id,
-		"domain_name":        record.GetString("domain_name"),
-		"status":             record.GetString("status"),
-		"active":             record.GetBool("active"),
-		"days_until_expiry":  daysUntilExpiry,
-		"registrar_name":     record.GetString("registrar_name"),
-		"registrar_id":       record.GetString("registrar_id"),
-		"name_servers":       record.Get("name_servers"),
-		"ipv4_addresses":     record.Get("ipv4_addresses"),
-		"ssl_issuer":         record.GetString("ssl_issuer"),
-		"ssl_issuer_country": record.GetString("ssl_issuer_country"),
-		"ssl_subject":        record.GetString("ssl_subject"),
-		"ssl_days_until":     sslDaysUntil,
-		"ssl_fingerprint":    record.GetString("ssl_fingerprint"),
-		"ssl_key_size":       record.GetInt("ssl_key_size"),
-		"ssl_signature_algo": record.GetString("ssl_signature_algo"),
-		"host_country":       record.GetString("host_country"),
-		"host_isp":           record.GetString("host_isp"),
-		"purchase_price":     record.GetFloat("purchase_price"),
-		"current_value":      record.GetFloat("current_value"),
-		"renewal_cost":       record.GetFloat("renewal_cost"),
-		"auto_renew":         record.GetBool("auto_renew"),
-		"alert_days_before":  record.GetInt("alert_days_before"),
-		"ssl_alert_enabled":  record.GetBool("ssl_alert_enabled"),
-		"tags":               record.Get("tags"),
-		"notes":              record.GetString("notes"),
-		"favicon_url":        record.GetString("favicon_url"),
-		"created":            record.GetDateTime("created").String(),
-		"updated":            record.GetDateTime("updated").String(),
+		"id":                         record.Id,
+		"domain_name":                record.GetString("domain_name"),
+		"status":                     record.GetString("status"),
+		"active":                     record.GetBool("active"),
+		"days_until_expiry":          daysUntilExpiry,
+		"registrar_name":             record.GetString("registrar_name"),
+		"registrar_id":               record.GetString("registrar_id"),
+		"registrar_url":              record.GetString("registrar_url"),
+		"registry_domain_id":         record.GetString("registry_domain_id"),
+		"dnssec":                     record.GetString("dnssec"),
+		"name_servers":               record.Get("name_servers"),
+		"mx_records":                 record.Get("mx_records"),
+		"txt_records":                record.Get("txt_records"),
+		"ipv4_addresses":             record.Get("ipv4_addresses"),
+		"ipv6_addresses":             record.Get("ipv6_addresses"),
+		"ssl_issuer":                 record.GetString("ssl_issuer"),
+		"ssl_issuer_country":         record.GetString("ssl_issuer_country"),
+		"ssl_subject":                record.GetString("ssl_subject"),
+		"ssl_days_until":             sslDaysUntil,
+		"ssl_fingerprint":            record.GetString("ssl_fingerprint"),
+		"ssl_key_size":               record.GetInt("ssl_key_size"),
+		"ssl_signature_algo":         record.GetString("ssl_signature_algo"),
+		"host_country":               record.GetString("host_country"),
+		"host_region":                record.GetString("host_region"),
+		"host_city":                  record.GetString("host_city"),
+		"host_isp":                   record.GetString("host_isp"),
+		"host_org":                   record.GetString("host_org"),
+		"host_as":                    record.GetString("host_as"),
+		"host_lat":                   record.GetFloat("host_lat"),
+		"host_lon":                   record.GetFloat("host_lon"),
+		"purchase_price":             record.GetFloat("purchase_price"),
+		"current_value":              record.GetFloat("current_value"),
+		"renewal_cost":               record.GetFloat("renewal_cost"),
+		"auto_renew":                 record.GetBool("auto_renew"),
+		"alert_days_before":          record.GetInt("alert_days_before"),
+		"ssl_alert_enabled":          record.GetBool("ssl_alert_enabled"),
+		"ssl_alert_days":             record.GetInt("ssl_alert_days"),
+		"monitor_type":               record.GetString("monitor_type"),
+		"notify_on_expiry":           record.GetBool("notify_on_expiry"),
+		"notify_on_ssl_expiry":       record.GetBool("notify_on_ssl_expiry"),
+		"notify_on_dns_change":       record.GetBool("notify_on_dns_change"),
+		"notify_on_registrar_change": record.GetBool("notify_on_registrar_change"),
+		"notify_on_value_change":     record.GetBool("notify_on_value_change"),
+		"value_change_threshold":     record.GetFloat("value_change_threshold"),
+		"quiet_hours_enabled":        record.GetBool("quiet_hours_enabled"),
+		"quiet_hours_start":          record.GetString("quiet_hours_start"),
+		"quiet_hours_end":            record.GetString("quiet_hours_end"),
+		"registrant_name":            record.GetString("registrant_name"),
+		"registrant_org":             record.GetString("registrant_org"),
+		"registrant_country":         record.GetString("registrant_country"),
+		"registrant_city":            record.GetString("registrant_city"),
+		"registrant_state":           record.GetString("registrant_state"),
+		"abuse_email":                record.GetString("abuse_email"),
+		"abuse_phone":                record.GetString("abuse_phone"),
+		"tags":                       record.Get("tags"),
+		"notes":                      record.GetString("notes"),
+		"favicon_url":                record.GetString("favicon_url"),
+		"created":                    record.GetDateTime("created").String(),
+		"updated":                    record.GetDateTime("updated").String(),
 	}
 
 	if !expiryDate.IsZero() {
@@ -585,6 +617,59 @@ func (h *APIHandler) recordToResponse(record *core.Record) map[string]interface{
 	}
 
 	return resp
+}
+
+func (h *APIHandler) applyLookupData(record *core.Record, domainData *domain.Domain) {
+	if domainData.ExpiryDate != nil {
+		record.Set("expiry_date", *domainData.ExpiryDate)
+	}
+	if domainData.CreationDate != nil {
+		record.Set("creation_date", *domainData.CreationDate)
+	}
+	if domainData.UpdatedDate != nil {
+		record.Set("updated_date", *domainData.UpdatedDate)
+	}
+	record.Set("registrar_name", domainData.RegistrarName)
+	record.Set("registrar_id", domainData.RegistrarID)
+	record.Set("registrar_url", domainData.RegistrarURL)
+	record.Set("registry_domain_id", domainData.RegistryDomainID)
+	record.Set("dnssec", domainData.DNSSEC)
+	record.Set("name_servers", domainData.NameServers)
+	record.Set("mx_records", domainData.MXRecords)
+	record.Set("txt_records", domainData.TXTRecords)
+	record.Set("ipv4_addresses", domainData.IPv4Addresses)
+	record.Set("ipv6_addresses", domainData.IPv6Addresses)
+	record.Set("ssl_issuer", domainData.SSLIssuer)
+	record.Set("ssl_issuer_country", domainData.SSLIssuerCountry)
+	record.Set("ssl_subject", domainData.SSLSubject)
+	if domainData.SSLValidFrom != nil {
+		record.Set("ssl_valid_from", *domainData.SSLValidFrom)
+	}
+	if domainData.SSLValidTo != nil {
+		record.Set("ssl_valid_to", *domainData.SSLValidTo)
+	}
+	record.Set("ssl_fingerprint", domainData.SSLFingerprint)
+	record.Set("ssl_key_size", domainData.SSLKeySize)
+	record.Set("ssl_signature_algo", domainData.SSLSignatureAlgo)
+	record.Set("host_country", domainData.HostCountry)
+	record.Set("host_region", domainData.HostRegion)
+	record.Set("host_city", domainData.HostCity)
+	record.Set("host_isp", domainData.HostISP)
+	record.Set("host_org", domainData.HostOrg)
+	record.Set("host_as", domainData.HostAS)
+	record.Set("host_lat", domainData.HostLat)
+	record.Set("host_lon", domainData.HostLon)
+	record.Set("registrant_name", domainData.RegistrantName)
+	record.Set("registrant_org", domainData.RegistrantOrg)
+	record.Set("registrant_street", domainData.RegistrantStreet)
+	record.Set("registrant_city", domainData.RegistrantCity)
+	record.Set("registrant_state", domainData.RegistrantState)
+	record.Set("registrant_country", domainData.RegistrantCountry)
+	record.Set("registrant_postal", domainData.RegistrantPostal)
+	record.Set("abuse_email", domainData.AbuseEmail)
+	record.Set("abuse_phone", domainData.AbusePhone)
+	record.Set("favicon_url", domainData.FaviconURL)
+	record.Set("last_checked", time.Now())
 }
 
 // cleanDomain cleans and normalizes a domain name

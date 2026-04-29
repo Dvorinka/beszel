@@ -2,13 +2,16 @@ package monitors
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/henrygd/beszel/internal/entities/incident"
 	"github.com/henrygd/beszel/internal/entities/monitor"
 	"github.com/henrygd/beszel/internal/hub/monitors/checks"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/store"
 )
@@ -194,50 +197,15 @@ func (s *Scheduler) runCheck(m *monitor.Monitor) {
 
 // saveResult saves the check result to the database and sends notifications on status change
 func (s *Scheduler) saveResult(m *monitor.Monitor, result *monitor.CheckResult) error {
-	// Update monitor record
 	record, err := s.app.FindRecordById("monitors", m.ID)
 	if err != nil {
 		return fmt.Errorf("failed to find monitor: %w", err)
 	}
 
-	// Get previous status for change detection
 	prevStatus := monitor.Status(record.GetString("status"))
 	newStatus := result.Status
+	now := time.Now()
 
-	// Update status
-	record.Set("status", string(newStatus))
-	record.Set("last_check", time.Now())
-
-	// Track status changes and send notifications
-	if prevStatus != newStatus {
-		s.handleStatusChange(m, record, prevStatus, newStatus, result)
-	}
-
-	// Calculate uptime stats (simplified - in production would aggregate from heartbeats)
-	if m.UptimeStats == nil {
-		m.UptimeStats = make(map[string]float64)
-	}
-
-	// Simple rolling uptime calculation (can be improved)
-	if result.Status == monitor.StatusUp {
-		m.UptimeStats["total"] = m.UptimeStats["total"] + 1
-		m.UptimeStats["up"] = m.UptimeStats["up"] + 1
-	} else {
-		m.UptimeStats["total"] = m.UptimeStats["total"] + 1
-		m.UptimeStats["down"] = m.UptimeStats["down"] + 1
-	}
-
-	if total := m.UptimeStats["total"]; total > 0 {
-		m.UptimeStats["uptime_24h"] = (m.UptimeStats["up"] / total) * 100
-	}
-
-	record.Set("uptime_stats", m.UptimeStats)
-
-	if err := s.app.Save(record); err != nil {
-		return fmt.Errorf("failed to update monitor: %w", err)
-	}
-
-	// Create heartbeat record
 	hbCollection, err := s.app.FindCollectionByNameOrId("monitor_heartbeats")
 	if err != nil {
 		return fmt.Errorf("failed to find heartbeats collection: %w", err)
@@ -250,10 +218,32 @@ func (s *Scheduler) saveResult(m *monitor.Monitor, result *monitor.CheckResult) 
 	hbRecord.Set("msg", result.Msg)
 	hbRecord.Set("cert_expiry", result.CertExpiry)
 	hbRecord.Set("cert_valid", result.CertValid)
-	hbRecord.Set("time", time.Now())
+	hbRecord.Set("time", now)
 
 	if err := s.app.Save(hbRecord); err != nil {
 		return fmt.Errorf("failed to save heartbeat: %w", err)
+	}
+
+	stats, err := s.calculateUptimeStats(m.ID)
+	if err != nil {
+		return fmt.Errorf("failed to calculate uptime stats: %w", err)
+	}
+	stats["last_ping"] = float64(result.Ping)
+
+	record.Set("status", string(newStatus))
+	record.Set("last_check", now)
+	record.Set("uptime_stats", stats)
+
+	if err := s.app.Save(record); err != nil {
+		return fmt.Errorf("failed to update monitor: %w", err)
+	}
+
+	m.Status = newStatus
+	m.LastCheck = now
+	m.UptimeStats = stats
+
+	if prevStatus != newStatus {
+		s.handleStatusChange(m, record, prevStatus, newStatus, result)
 	}
 
 	return nil
@@ -270,23 +260,17 @@ func (s *Scheduler) handleStatusChange(m *monitor.Monitor, record *core.Record, 
 	isRecovery := false
 
 	switch {
-	case prevStatus == monitor.StatusUp && newStatus == monitor.StatusDown:
+	case newStatus == monitor.StatusDown && prevStatus != monitor.StatusDown:
 		title = fmt.Sprintf("Monitor Down: %s", m.Name)
 		message = fmt.Sprintf("The monitor %s (%s) is now DOWN.\n\nError: %s", m.Name, m.URL, result.Msg)
 	case prevStatus == monitor.StatusDown && newStatus == monitor.StatusUp:
 		title = fmt.Sprintf("Monitor Recovered: %s", m.Name)
 		message = fmt.Sprintf("The monitor %s (%s) is now UP.\n\nResponse time: %dms", m.Name, m.URL, result.Ping)
 		isRecovery = true
-	case newStatus == monitor.StatusDown:
-		// Still down after retry
-		title = fmt.Sprintf("Monitor Still Down: %s", m.Name)
-		message = fmt.Sprintf("The monitor %s (%s) remains DOWN.\n\nError: %s", m.Name, m.URL, result.Msg)
 	default:
-		// Other status changes, don't notify
 		return
 	}
 
-	// Create incident record for status change
 	s.createIncident(m, prevStatus, newStatus, result, isRecovery)
 
 	// Send notification via AlertManager if available
@@ -301,23 +285,72 @@ func (s *Scheduler) handleStatusChange(m *monitor.Monitor, record *core.Record, 
 
 // createIncident creates an incident record for the status change
 func (s *Scheduler) createIncident(m *monitor.Monitor, prevStatus, newStatus monitor.Status, result *monitor.CheckResult, isRecovery bool) {
-	incidentCollection, err := s.app.FindCollectionByNameOrId("monitor_incidents")
+	if isRecovery {
+		records, err := s.app.FindRecordsByFilter(
+			"incidents",
+			"monitor = {:monitor} && type = {:type} && (status = {:open} || status = {:acknowledged})",
+			"-started_at",
+			0,
+			0,
+			dbx.Params{
+				"monitor":      m.ID,
+				"type":         incident.TypeMonitorDown,
+				"open":         incident.StatusOpen,
+				"acknowledged": incident.StatusAcknowledged,
+			},
+		)
+		if err != nil {
+			log.Printf("[monitor-scheduler] Failed to find open incident: %v", err)
+			return
+		}
+
+		now := time.Now()
+		for _, record := range records {
+			record.Set("status", incident.StatusResolved)
+			record.Set("resolved_at", now)
+			record.Set("resolution", fmt.Sprintf("Monitor recovered: %s", result.Msg))
+			if err := s.app.Save(record); err != nil {
+				log.Printf("[monitor-scheduler] Failed to resolve incident: %v", err)
+			}
+		}
+		return
+	}
+
+	if newStatus != monitor.StatusDown || prevStatus == monitor.StatusDown {
+		return
+	}
+
+	existing, err := s.app.FindFirstRecordByFilter(
+		"incidents",
+		"monitor = {:monitor} && type = {:type} && (status = {:open} || status = {:acknowledged})",
+		dbx.Params{
+			"monitor":      m.ID,
+			"type":         incident.TypeMonitorDown,
+			"open":         incident.StatusOpen,
+			"acknowledged": incident.StatusAcknowledged,
+		},
+	)
+	if err == nil && existing != nil {
+		return
+	}
+
+	incidentCollection, err := s.app.FindCollectionByNameOrId("incidents")
 	if err != nil {
-		// Collection might not exist, just log
 		log.Printf("[monitor-scheduler] Could not create incident: %v", err)
 		return
 	}
 
-	incident := core.NewRecord(incidentCollection)
-	incident.Set("monitor", m.ID)
-	incident.Set("prev_status", string(prevStatus))
-	incident.Set("new_status", string(newStatus))
-	incident.Set("message", result.Msg)
-	incident.Set("ping", result.Ping)
-	incident.Set("is_recovery", isRecovery)
-	incident.Set("time", time.Now())
+	record := core.NewRecord(incidentCollection)
+	record.Set("title", fmt.Sprintf("Monitor Down: %s", m.Name))
+	record.Set("description", result.Msg)
+	record.Set("type", incident.TypeMonitorDown)
+	record.Set("severity", incident.SeverityHigh)
+	record.Set("status", incident.StatusOpen)
+	record.Set("monitor", m.ID)
+	record.Set("started_at", time.Now())
+	record.Set("user", m.UserID)
 
-	if err := s.app.Save(incident); err != nil {
+	if err := s.app.Save(record); err != nil {
 		log.Printf("[monitor-scheduler] Failed to save incident: %v", err)
 	}
 }
@@ -403,6 +436,9 @@ func (s *Scheduler) RunManualCheck(monitorID string) (*monitor.CheckResult, erro
 	defer cancel()
 
 	result := checker.Check(ctx, m)
+	if err := s.saveResult(m, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -453,6 +489,61 @@ func (s *Scheduler) GetUptimeStats(monitorID string, hours int) (*monitor.Uptime
 	return stats, nil
 }
 
+func (s *Scheduler) calculateUptimeStats(monitorID string) (map[string]float64, error) {
+	stats := make(map[string]float64)
+	for _, window := range []struct {
+		hours int
+		key   string
+	}{
+		{24, "uptime_24h"},
+		{168, "uptime_7d"},
+		{720, "uptime_30d"},
+	} {
+		windowStats, err := s.GetUptimeStats(monitorID, window.hours)
+		if err != nil {
+			return nil, err
+		}
+		if windowStats.Total > 0 {
+			stats[window.key] = float64(windowStats.Up) / float64(windowStats.Total) * 100
+		}
+		stats[fmt.Sprintf("checks_%s", window.key)] = float64(windowStats.Total)
+	}
+
+	avgPing, err := s.averagePing(monitorID, 24)
+	if err != nil {
+		return nil, err
+	}
+	stats["avg_ping_24h"] = avgPing
+	return stats, nil
+}
+
+func (s *Scheduler) averagePing(monitorID string, hours int) (float64, error) {
+	since := time.Now().Add(-time.Duration(hours) * time.Hour)
+	records, err := s.app.FindRecordsByFilter(
+		"monitor_heartbeats",
+		"monitor = {:monitorId} && time >= {:since} && status = {:status}",
+		"-time",
+		0,
+		0,
+		dbx.Params{
+			"monitorId": monitorID,
+			"since":     since.Format("2006-01-02 15:04:05"),
+			"status":    string(monitor.StatusUp),
+		},
+	)
+	if err != nil {
+		return 0, err
+	}
+	if len(records) == 0 {
+		return 0, nil
+	}
+	total := 0
+	for _, record := range records {
+		total += record.GetInt("ping")
+	}
+	return float64(total) / float64(len(records)), nil
+}
+
 // recordToMonitor converts a PocketBase record to a Monitor struct
 func recordToMonitor(record *core.Record) *monitor.Monitor {
 	m := &monitor.Monitor{
@@ -493,8 +584,11 @@ func recordToMonitor(record *core.Record) *monitor.Monitor {
 	}
 
 	if statsData := record.Get("uptime_stats"); statsData != nil {
-		if stats, ok := statsData.(map[string]float64); ok {
-			m.UptimeStats = stats
+		stats := map[string]float64{}
+		if raw, err := json.Marshal(statsData); err == nil {
+			if err := json.Unmarshal(raw, &stats); err == nil {
+				m.UptimeStats = stats
+			}
 		}
 	}
 
