@@ -41,6 +41,13 @@ __debug_*
 # Reference code (external projects)
 reference/
 
+# Graphify output - only keep json, md, html in root
+graphify-out/*/
+graphify-out/*.svg
+!graphify-out/*.json
+!graphify-out/*.md
+!graphify-out/*.html
+
 # Environment
 .env
 .env.local

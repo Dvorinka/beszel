@@ -151,8 +151,8 @@ msgid "Add Monitor"
 msgstr ""
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Add System"
-msgstr ""
+#~ msgid "Add System"
+#~ msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
@@ -203,12 +203,10 @@ msgstr "Historia alertów"
 msgid "Alerts"
 msgstr "Alerty"
 
-#. placeholder {0}: data.length
 #. placeholder {0}: stats.total
 #. placeholder {0}: statusCounts.total
 #: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
-#: src/components/systems-table/systems-table.tsx
 msgid "All ({0})"
 msgstr ""
 
@@ -224,8 +222,13 @@ msgstr "Wszystkie kontenery"
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table.tsx
+#: src/components/systems-table/systems-table.tsx
 msgid "All Systems"
 msgstr "Wszystkie systemy"
+
+#: src/components/routes/settings/general.tsx
+msgid "App update"
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -338,6 +341,10 @@ msgstr "Beszel obsługuje OpenID Connect i wielu dostawców uwierzytelniania OAu
 msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr "Beszel używa <0>Shoutrrr</0> do integracji z popularnymi serwisami powiadomień."
 
+#: src/components/routes/settings/general.tsx
+msgid "Beszel will pull ghcr.io/dvorinka/beszel:latest, recreate the running container, and restart the app. All signed-in users can start this action."
+msgstr ""
+
 #: src/components/add-system.tsx
 msgid "Binary"
 msgstr "Plik binarny"
@@ -385,6 +392,7 @@ msgstr "Może zatrzymać"
 #: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/add-monitor-dialog.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
+#: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Cancel"
@@ -447,6 +455,10 @@ msgstr "Sprawdź {email}, aby uzyskać link do resetowania."
 msgid "Check logs for more details."
 msgstr "Sprawdź logi, aby uzyskać więcej informacji."
 
+#: src/components/routes/settings/general.tsx
+msgid "Check now"
+msgstr ""
+
 #: src/components/routes/monitor.tsx
 msgid "Check Now"
 msgstr ""
@@ -482,8 +494,8 @@ msgid "Click to copy"
 msgstr "Kliknij, aby skopiować"
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Columns"
-msgstr ""
+#~ msgid "Columns"
+#~ msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -1750,6 +1762,10 @@ msgstr ""
 #~ msgid "Response Times"
 #~ msgstr ""
 
+#: src/components/routes/settings/general.tsx
+msgid "Restarting"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Restarts"
 msgstr "Uruchamia ponownie"
@@ -1917,8 +1933,8 @@ msgid "SMTP settings"
 msgstr "Ustawienia SMTP"
 
 #: src/components/systems-table/systems-table.tsx
-#~ msgid "Sort By"
-#~ msgstr "Sortuj według"
+msgid "Sort By"
+msgstr "Sortuj według"
 
 #: src/components/routes/domain.tsx
 #~ msgid "SSL Certificate"
@@ -1928,6 +1944,10 @@ msgstr "Ustawienia SMTP"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Start Time"
 msgstr "Czas rozpoczęcia"
+
+#: src/components/routes/settings/general.tsx
+msgid "Start update"
+msgstr ""
 
 #. Context: alert state (active or resolved)
 #: src/components/alerts-history-columns.tsx
@@ -2248,8 +2268,21 @@ msgstr "Działa ({upSystemsLength})"
 msgid "Update"
 msgstr "Aktualizuj"
 
+#: src/components/navbar.tsx
+#: src/components/navbar.tsx
+msgid "Update available"
+msgstr ""
+
+#: src/components/routes/settings/general.tsx
+msgid "Update Beszel now?"
+msgstr ""
+
 #: src/components/monitors-table/add-monitor-dialog.tsx
 msgid "Update Monitor"
+msgstr ""
+
+#: src/components/routes/settings/general.tsx
+msgid "Update now"
 msgstr ""
 
 #: src/components/containers-table/containers-table-columns.tsx
@@ -2335,8 +2368,8 @@ msgid "View your 200 most recent alerts."
 msgstr "Wyświetl 200 ostatnich alertów."
 
 #: src/components/systems-table/systems-table.tsx
-#~ msgid "Visible Fields"
-#~ msgstr "Widoczne kolumny"
+msgid "Visible Fields"
+msgstr "Widoczne kolumny"
 
 #: src/components/routes/domain.tsx
 #: src/components/routes/monitor.tsx

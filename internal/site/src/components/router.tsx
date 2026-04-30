@@ -11,6 +11,7 @@ const routes = {
 	forgot_password: `/forgot-password`,
 	request_otp: `/request-otp`,
 	status_pages: `/status-pages`,
+	public_status: `/status/:slug`,
 	incidents: `/incidents`,
 	calendar: `/calendar`,
 	monitoring: `/monitoring`,

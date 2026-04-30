@@ -1,17 +1,13 @@
 package hub
 
 import (
-	"context"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/google/uuid"
 	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/internal/alerts"
-	"github.com/henrygd/beszel/internal/ghupdate"
 	"github.com/henrygd/beszel/internal/hub/config"
 	"github.com/henrygd/beszel/internal/hub/systems"
 	"github.com/henrygd/beszel/internal/hub/utils"
@@ -19,13 +15,6 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
-
-// UpdateInfo holds information about the latest update check
-type UpdateInfo struct {
-	lastCheck time.Time
-	Version   string `json:"v"`
-	Url       string `json:"url"`
-}
 
 var containerIDPattern = regexp.MustCompile(`^[a-fA-F0-9]{12,64}$`)
 
@@ -104,11 +93,9 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	// get public key and version
 	apiAuth.GET("/info", h.getInfo)
 	apiAuth.GET("/getkey", h.getInfo) // deprecated - keep for compatibility w/ integrations
-	// check for updates
-	if optIn, _ := utils.GetEnv("CHECK_UPDATES"); optIn == "true" {
-		var updateInfo UpdateInfo
-		apiAuth.GET("/update", updateInfo.getUpdate)
-	}
+	// check for and apply app image updates
+	apiAuth.GET("/update", h.getUpdate)
+	apiAuth.POST("/update/apply", h.applyUpdate)
 	// send test notification
 	apiAuth.POST("/test-notification", h.SendTestNotification)
 	// heartbeat status and test
@@ -148,34 +135,7 @@ func (h *Hub) getInfo(e *core.RequestEvent) error {
 		Key:     h.pubKey,
 		Version: beszel.Version,
 	}
-	if optIn, _ := utils.GetEnv("CHECK_UPDATES"); optIn == "true" {
-		info.CheckUpdate = true
-	}
-	return e.JSON(http.StatusOK, info)
-}
-
-// getUpdate checks for the latest release on GitHub and returns update info if a newer version is available
-func (info *UpdateInfo) getUpdate(e *core.RequestEvent) error {
-	if time.Since(info.lastCheck) < 6*time.Hour {
-		return e.JSON(http.StatusOK, info)
-	}
-	info.lastCheck = time.Now()
-	latestRelease, err := ghupdate.FetchLatestRelease(context.Background(), http.DefaultClient, "")
-	if err != nil {
-		return err
-	}
-	currentVersion, err := semver.Parse(strings.TrimPrefix(beszel.Version, "v"))
-	if err != nil {
-		return err
-	}
-	latestVersion, err := semver.Parse(strings.TrimPrefix(latestRelease.Tag, "v"))
-	if err != nil {
-		return err
-	}
-	if latestVersion.GT(currentVersion) {
-		info.Version = strings.TrimPrefix(latestRelease.Tag, "v")
-		info.Url = latestRelease.Url
-	}
+	info.CheckUpdate = true
 	return e.JSON(http.StatusOK, info)
 }
 

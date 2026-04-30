@@ -25,15 +25,15 @@ import {
 	getStatusPageUrl,
 	type StatusPage,
 } from "@/lib/statuspages"
-import { MoreHorizontal, Plus, ExternalLink, Globe, Lock } from "lucide-react"
+import { MoreHorizontal, Plus, ExternalLink, Globe, Lock, Copy, Check, LayoutTemplate, ArrowRight } from "lucide-react"
 import { StatusPageDialog } from "./status-page-dialog"
-import { Link } from "@/components/router"
 
 export function StatusPagesTable() {
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
 	const [dialogOpen, setDialogOpen] = useState(false)
 	const [editingPage, setEditingPage] = useState<StatusPage | null>(null)
+	const [copiedId, setCopiedId] = useState<string | null>(null)
 
 	const { data: pages, isLoading } = useQuery({
 		queryKey: ["status-pages"],
@@ -65,14 +65,50 @@ export function StatusPagesTable() {
 		setDialogOpen(true)
 	}
 
-	const handleDelete = (id: string) => {
-		if (confirm("Are you sure you want to delete this status page?")) {
-			deleteMutation.mutate(id)
+	const handleDelete = (page: StatusPage) => {
+		if (confirm(`Are you sure you want to delete "${page.name}"?\n\nThis will remove the status page and unlink all ${page.monitor_count} monitor(s). This action cannot be undone.`)) {
+			deleteMutation.mutate(page.id)
+		}
+	}
+
+	const handleCopyUrl = async (page: StatusPage) => {
+		if (!page.public) {
+			toast({ title: "Status page must be public to copy URL", variant: "destructive" })
+			return
+		}
+		const url = window.location.origin + getStatusPageUrl(page.slug)
+		try {
+			await navigator.clipboard.writeText(url)
+			setCopiedId(page.id)
+			toast({ title: "URL copied to clipboard" })
+			setTimeout(() => setCopiedId(null), 2000)
+		} catch {
+			toast({ title: "Failed to copy URL", variant: "destructive" })
 		}
 	}
 
 	if (isLoading) {
-		return <div className="p-4">Loading...</div>
+		return (
+			<div className="space-y-4">
+				<div className="flex items-center justify-between">
+					<div className="h-5 w-32 bg-muted rounded animate-pulse" />
+					<div className="h-9 w-36 bg-muted rounded animate-pulse" />
+				</div>
+				<div className="rounded-md border">
+					<div className="p-4 space-y-3">
+						{[1, 2, 3].map((i) => (
+							<div key={i} className="flex items-center gap-4">
+								<div className="h-4 w-32 bg-muted rounded animate-pulse" />
+								<div className="h-4 w-24 bg-muted rounded animate-pulse" />
+								<div className="h-4 w-16 bg-muted rounded animate-pulse" />
+								<div className="h-4 w-20 bg-muted rounded animate-pulse" />
+								<div className="h-8 w-8 bg-muted rounded animate-pulse ml-auto" />
+							</div>
+						))}
+					</div>
+				</div>
+			</div>
+		)
 	}
 
 	return (
@@ -99,8 +135,22 @@ export function StatusPagesTable() {
 					<TableBody>
 						{pages?.length === 0 ? (
 							<TableRow>
-								<TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-									No status pages yet. Create one to share your service status publicly.
+								<TableCell colSpan={5} className="text-center py-12">
+									<div className="flex flex-col items-center gap-3">
+										<div className="p-3 bg-muted rounded-full">
+											<LayoutTemplate className="h-6 w-6 text-muted-foreground" />
+										</div>
+										<div>
+											<p className="font-medium text-muted-foreground">No status pages yet</p>
+											<p className="text-sm text-muted-foreground mt-1">
+												Create one to share your service status publicly
+											</p>
+										</div>
+										<Button onClick={handleAdd} variant="outline" className="mt-2">
+											Create Status Page
+											<ArrowRight className="ml-2 h-4 w-4" />
+										</Button>
+									</div>
 								</TableCell>
 							</TableRow>
 						) : (
@@ -134,20 +184,30 @@ export function StatusPagesTable() {
 													Edit
 												</DropdownMenuItem>
 												{page.public && (
-													<DropdownMenuItem asChild>
-														<a
-															href={getStatusPageUrl(page.slug)}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="flex items-center"
-														>
-															<ExternalLink className="mr-2 h-4 w-4" />
-															View Public Page
-														</a>
-													</DropdownMenuItem>
+													<>
+														<DropdownMenuItem onClick={() => handleCopyUrl(page)}>
+															{copiedId === page.id ? (
+																<Check className="mr-2 h-4 w-4 text-green-500" />
+															) : (
+																<Copy className="mr-2 h-4 w-4" />
+															)}
+															{copiedId === page.id ? 'Copied!' : 'Copy URL'}
+														</DropdownMenuItem>
+														<DropdownMenuItem asChild>
+															<a
+																href={getStatusPageUrl(page.slug)}
+																target="_blank"
+																rel="noopener noreferrer"
+																className="flex items-center"
+															>
+																<ExternalLink className="mr-2 h-4 w-4" />
+																View Public Page
+															</a>
+														</DropdownMenuItem>
+													</>
 												)}
 												<DropdownMenuItem
-													onClick={() => handleDelete(page.id)}
+													onClick={() => handleDelete(page)}
 													className="text-destructive"
 												>
 													Delete

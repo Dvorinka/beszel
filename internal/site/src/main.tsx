@@ -13,7 +13,7 @@ import Settings from "@/components/routes/settings/layout.tsx"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { Toaster } from "@/components/ui/toaster.tsx"
 import { alertManager } from "@/lib/alerts"
-import { isAdmin, pb, updateUserSettings } from "@/lib/api.ts"
+import { pb, updateUserSettings } from "@/lib/api.ts"
 import { dynamicActivate, getLocale } from "@/lib/i18n"
 import {
 	$authenticated,
@@ -35,6 +35,7 @@ const SystemDetail = lazy(() => import("@/components/routes/system.tsx"))
 const DomainDetail = lazy(() => import("@/components/routes/domain.tsx"))
 const MonitorDetail = lazy(() => import("@/components/routes/monitor.tsx"))
 const StatusPages = lazy(() => import("@/components/routes/status-pages.tsx"))
+const PublicStatusPage = lazy(() => import("@/components/routes/public-status-page.tsx"))
 const Incidents = lazy(() => import("@/components/routes/incidents.tsx"))
 const Calendar = lazy(() => import("@/components/routes/calendar.tsx"))
 const Monitoring = lazy(() => import("@/components/routes/monitoring.tsx"))
@@ -52,7 +53,7 @@ const App = memo(() => {
 		pb.send<BeszelInfo>("/api/beszel/info", {}).then((data) => {
 			$publicKey.set(data.key)
 			// check for updates if enabled
-			if (data.cu && isAdmin()) {
+			if (data.cu) {
 				pb.send<UpdateInfo>("/api/beszel/update", {}).then($newVersion.set)
 			}
 		})
@@ -94,6 +95,8 @@ const App = memo(() => {
 		return <Settings />
 	} else if (page.route === "status_pages") {
 		return <StatusPages />
+	} else if (page.route === "public_status") {
+		return <PublicStatusPage slug={page.params.slug} />
 	} else if (page.route === "incidents") {
 		return <Incidents />
 	} else if (page.route === "calendar") {
@@ -108,16 +111,25 @@ const Layout = () => {
 	const copyContent = useStore($copyContent)
 	const direction = useStore($direction)
 	const { layoutWidth } = useStore($userSettings, { keys: ["layoutWidth"] })
+	const page = useStore($router)
 
 	useEffect(() => {
 		document.documentElement.dir = direction
 	}, [direction])
 
+	// Public status page doesn't require authentication
+	const isPublicStatusPage = page?.route === "public_status"
+
 	return (
 		<DirectionProvider dir={direction}>
-			{!authenticated ? (
+			{!authenticated && !isPublicStatusPage ? (
 				<Suspense>
 					<LoginPage />
+				</Suspense>
+			) : isPublicStatusPage ? (
+				// Public status page renders without navbar/layout
+				<Suspense>
+					<App />
 				</Suspense>
 			) : (
 				<div style={{ "--container": `${layoutWidth ?? defaultLayoutWidth}px` } as React.CSSProperties}>

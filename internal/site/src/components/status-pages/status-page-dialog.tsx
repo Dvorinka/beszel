@@ -1,12 +1,21 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
+
+// Generate slug from name
+const generateSlug = (name: string): string => {
+	return name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '')
+		.slice(0, 50)
+}
 import {
 	Dialog,
 	DialogContent,
@@ -38,8 +47,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
 	createStatusPage,
 	updateStatusPage,
+	getStatusPageUrl,
 	type StatusPage,
 } from "@/lib/statuspages"
+import { ExternalLink, RefreshCw } from "lucide-react"
 
 const formSchema = z.object({
 	name: z.string().min(1, "Name is required"),
@@ -162,6 +173,29 @@ export function StatusPageDialog({
 
 	const isPending = createMutation.isPending || updateMutation.isPending
 
+	// Auto-generate slug from name when creating new status page
+	const lastAutoSlug = useRef<string>("")
+	useEffect(() => {
+		if (isEdit) return // Don't auto-generate in edit mode
+		
+		const subscription = form.watch((value, { name: fieldName }) => {
+			if (fieldName === 'name') {
+				const name = value.name || ''
+				const currentSlug = form.getValues('slug') || ''
+				const newSlug = generateSlug(name)
+				
+				// Only auto-generate if:
+				// 1. Slug is empty, OR
+				// 2. Current slug matches the last auto-generated slug (user hasn't manually edited)
+				if (!currentSlug || currentSlug === lastAutoSlug.current) {
+					form.setValue('slug', newSlug, { shouldValidate: true })
+					lastAutoSlug.current = newSlug
+				}
+			}
+		})
+		return () => subscription.unsubscribe()
+	}, [form, isEdit])
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
@@ -203,12 +237,45 @@ export function StatusPageDialog({
 									name="slug"
 									render={({ field }) => (
 										<FormItem>
-											<FormLabel>URL Slug</FormLabel>
+											<FormLabel className="flex items-center justify-between">
+												<span>URL Slug</span>
+												{!isEdit && form.getValues('name') && (
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														className="h-6 px-2 text-xs"
+														onClick={() => {
+															const newSlug = generateSlug(form.getValues('name') || '')
+															form.setValue('slug', newSlug, { shouldValidate: true })
+															lastAutoSlug.current = newSlug
+														}}
+													>
+														<RefreshCw className="mr-1 h-3 w-3" />
+														Regenerate
+													</Button>
+												)}
+											</FormLabel>
 											<FormControl>
-												<Input placeholder="my-services" {...field} />
+												<div className="flex items-center gap-2">
+													<span className="text-sm text-muted-foreground whitespace-nowrap">/status/</span>
+													<Input {...field} placeholder="my-services" className="flex-1" />
+												</div>
 											</FormControl>
-											<FormDescription>
-												The URL will be: /status/{field.value}
+											<FormDescription className="flex items-center justify-between">
+												<span>Full URL: {typeof window !== 'undefined' ? window.location.origin : ''}{getStatusPageUrl(field.value)}</span>
+												{field.value && (
+													<a
+														href={getStatusPageUrl(field.value)}
+														target="_blank"
+														rel="noopener noreferrer"
+														className="text-primary hover:underline inline-flex items-center gap-1"
+														onClick={(e) => e.stopPropagation()}
+													>
+														<ExternalLink className="h-3 w-3" />
+														Preview
+													</a>
+												)}
 											</FormDescription>
 											<FormMessage />
 										</FormItem>

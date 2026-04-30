@@ -65,6 +65,11 @@
 	},
 	"overrides": [
 		{
+			"includes": ["src/locales/**/*.ts"],
+			"formatter": { "enabled": false },
+			"linter": { "enabled": false }
+		},
+		{
 			"includes": ["**/*.jsx", "**/*.tsx"],
 			"linter": {
 				"rules": {

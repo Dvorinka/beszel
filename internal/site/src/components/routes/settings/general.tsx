@@ -1,20 +1,33 @@
 /** biome-ignore-all lint/correctness/useUniqueElementIds: component is only rendered once */
 import { Trans, useLingui } from "@lingui/react/macro"
-import { LanguagesIcon, LoaderCircleIcon, SaveIcon } from "lucide-react"
-import { useState } from "react"
+import { DownloadCloudIcon, LanguagesIcon, LoaderCircleIcon, RefreshCcwIcon, SaveIcon } from "lucide-react"
+import { useEffect, useState } from "react"
 import { useStore } from "@nanostores/react"
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { toast } from "@/components/ui/use-toast"
+import { pb } from "@/lib/api"
 import Slider from "@/components/ui/slider"
 import { HourFormat, Unit } from "@/lib/enums"
 import { dynamicActivate } from "@/lib/i18n"
 import languages from "@/lib/languages"
-import { $userSettings, defaultLayoutWidth } from "@/lib/stores"
+import { $newVersion, $userSettings, defaultLayoutWidth } from "@/lib/stores"
 import { chartTimeData, currentHour12 } from "@/lib/utils"
-import type { UserSettings } from "@/types"
+import type { UpdateInfo, UserSettings } from "@/types"
 import { saveSettings } from "./layout"
 
 export default function SettingsProfilePage({ userSettings }: { userSettings: UserSettings }) {
@@ -43,6 +56,8 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 				</p>
 			</div>
 			<Separator className="my-4" />
+			<AppUpdatePanel />
+			<Separator className="my-5" />
 			<form onSubmit={handleSubmit} className="space-y-5">
 				<div className="grid gap-2">
 					<div className="mb-2">
@@ -286,4 +301,190 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 			</form>
 		</div>
 	)
+}
+
+function AppUpdatePanel() {
+	const updateInfo = useStore($newVersion)
+	const [checking, setChecking] = useState(false)
+	const [applying, setApplying] = useState(false)
+	const [restartPending, setRestartPending] = useState(false)
+
+	async function refreshUpdateInfo() {
+		setChecking(true)
+		try {
+			const info = await pb.send<UpdateInfo>("/api/beszel/update", {})
+			$newVersion.set(info)
+		} catch (err) {
+			toast({
+				title: "Update check failed",
+				description: err instanceof Error ? err.message : "Could not check for updates.",
+				variant: "destructive",
+			})
+		} finally {
+			setChecking(false)
+		}
+	}
+
+	async function applyUpdate() {
+		setApplying(true)
+		try {
+			const res = await pb.send<{ message: string }>("/api/beszel/update/apply", { method: "POST" })
+			toast({
+				title: "Update started",
+				description: res.message,
+			})
+			setRestartPending(true)
+			$newVersion.set(updateInfo ? { ...updateInfo, status: "updating", message: res.message } : undefined)
+			const restarted = await waitForRestartAndReload()
+			if (!restarted) {
+				toast({
+					title: "Still waiting for restart",
+					description: "Beszel did not come back before the timeout. Check the Docker container logs.",
+					variant: "destructive",
+				})
+				setRestartPending(false)
+				setApplying(false)
+				await refreshUpdateInfo()
+			}
+		} catch (err) {
+			toast({
+				title: "Update failed",
+				description: err instanceof Error ? err.message : "Could not start the update.",
+				variant: "destructive",
+			})
+			setApplying(false)
+		}
+	}
+
+	useEffect(() => {
+		if (!updateInfo) {
+			refreshUpdateInfo()
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [])
+
+	const status = updateInfo?.status ?? "checking"
+	const message = restartPending
+		? "Update started. Waiting for Beszel to restart..."
+		: (updateInfo?.message ?? "Checking GHCR for the latest image.")
+	const canUpdate = Boolean(updateInfo?.canApply && updateInfo?.updateAvailable && !applying && !restartPending)
+
+	return (
+		<div className="rounded-md border bg-card/50 p-4">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+				<div className="space-y-1.5">
+					<h3 className="text-lg font-medium flex items-center gap-2">
+						<DownloadCloudIcon className="h-4 w-4" />
+						<Trans>App update</Trans>
+					</h3>
+					<p className="text-sm text-muted-foreground leading-relaxed">{message}</p>
+				</div>
+				<StatusBadge status={status} updateAvailable={Boolean(updateInfo?.updateAvailable)} />
+			</div>
+			<div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+				<UpdateMeta label="Image" value={updateInfo?.image ?? "ghcr.io/dvorinka/beszel:latest"} />
+				<UpdateMeta label="Current version" value={updateInfo?.currentVersion ?? "..."} />
+				<UpdateMeta label="Running digest" value={shortDigest(updateInfo?.currentDigest)} />
+				<UpdateMeta label="Latest digest" value={shortDigest(updateInfo?.latestDigest)} />
+			</div>
+			<div className="mt-4 flex flex-col gap-2 sm:flex-row">
+				<Button
+					type="button"
+					variant="outline"
+					onClick={refreshUpdateInfo}
+					disabled={checking || applying || restartPending}
+				>
+					{checking ? (
+						<LoaderCircleIcon className="me-2 h-4 w-4 animate-spin" />
+					) : (
+						<RefreshCcwIcon className="me-2 h-4 w-4" />
+					)}
+					<Trans>Check now</Trans>
+				</Button>
+				<AlertDialog>
+					<AlertDialogTrigger asChild>
+						<Button type="button" disabled={!canUpdate}>
+							{applying || restartPending ? (
+								<LoaderCircleIcon className="me-2 h-4 w-4 animate-spin" />
+							) : (
+								<DownloadCloudIcon className="me-2 h-4 w-4" />
+							)}
+							{restartPending ? <Trans>Restarting</Trans> : <Trans>Update now</Trans>}
+						</Button>
+					</AlertDialogTrigger>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>
+								<Trans>Update Beszel now?</Trans>
+							</AlertDialogTitle>
+							<AlertDialogDescription>
+								<Trans>
+									Beszel will pull ghcr.io/dvorinka/beszel:latest, recreate the running container, and restart the app.
+									All signed-in users can start this action.
+								</Trans>
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>
+								<Trans>Cancel</Trans>
+							</AlertDialogCancel>
+							<AlertDialogAction onClick={applyUpdate}>
+								<Trans>Start update</Trans>
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			</div>
+		</div>
+	)
+}
+
+function StatusBadge({ status, updateAvailable }: { status: string; updateAvailable: boolean }) {
+	const label = updateAvailable
+		? "Update available"
+		: status === "up-to-date"
+			? "Up to date"
+			: status.replaceAll("-", " ")
+	return (
+		<span className="inline-flex h-7 items-center self-start rounded-md border bg-background px-2.5 text-xs font-medium capitalize text-muted-foreground">
+			{label}
+		</span>
+	)
+}
+
+function UpdateMeta({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="min-w-0 rounded-md bg-muted/45 px-3 py-2">
+			<div className="text-xs text-muted-foreground">{label}</div>
+			<div className="truncate font-mono text-xs">{value}</div>
+		</div>
+	)
+}
+
+function shortDigest(value?: string) {
+	if (!value) return "unknown"
+	const digest = value.includes("@") ? value.split("@").at(-1) : value
+	if (!digest) return value
+	return digest.length > 24 ? `${digest.slice(0, 24)}...` : digest
+}
+
+async function waitForRestartAndReload() {
+	await sleep(10_000)
+	for (let attempt = 0; attempt < 45; attempt++) {
+		try {
+			const res = await fetch("/api/health", { cache: "no-store" })
+			if (res.ok) {
+				window.location.reload()
+				return true
+			}
+		} catch {
+			// Hub is expected to be unavailable while Docker replaces the container.
+		}
+		await sleep(2_000)
+	}
+	return false
+}
+
+function sleep(ms: number) {
+	return new Promise((resolve) => window.setTimeout(resolve, ms))
 }

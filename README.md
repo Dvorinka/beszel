@@ -20,6 +20,9 @@ services:
       - "${BESZEL_PORT:-8090}:8090"
     volumes:
       - beszel_data:/beszel_data
+      # Enables native in-app updates from ghcr.io/dvorinka/beszel:latest.
+      # Any registered Beszel user can trigger this update action.
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       APP_URL: "${APP_URL:-http://localhost:8090}"
       PUBLIC_URL: "${PUBLIC_URL:-}"
@@ -61,6 +64,12 @@ docker compose up -d
 The hub will be available at `http://localhost:8090` by default. For Dokploy or CasaOS, set `APP_URL` to the public URL of your deployment, for example `https://beszel.example.com`.
 
 Agents run on separate hosts and connect to the hub. See [Adding Agents](#adding-agents) below.
+
+### Native App Updates
+
+Beszel checks `ghcr.io/dvorinka/beszel:latest` from inside the app and shows update status in Settings > General. When the Docker socket is mounted, any registered user can start an in-app update. Beszel pulls the latest image, recreates the running container with the same Docker configuration, and restarts itself automatically.
+
+The Docker socket gives Beszel control over Docker on the host. Keep registration limited to trusted users.
 
 ### Environment Variables
 

@@ -1,4 +1,5 @@
 import type { RecordModel } from "pocketbase"
+import type { LucideIcon } from "lucide-react"
 import type { Unit, Os, BatteryState, HourFormat, ConnectionType, ServiceStatus, ServiceSubState } from "@/lib/enums"
 
 // global window properties
@@ -324,7 +325,7 @@ export interface ChartData {
 export interface AlertInfo {
 	name: () => string
 	unit: string
-	icon: any
+	icon: LucideIcon
 	desc: () => string
 	max?: number
 	min?: number
@@ -423,7 +424,7 @@ export interface SystemdRecord extends RecordModel {
 
 export interface SystemdServiceDetails {
 	AccessSELinuxContext: string
-	ActivationDetails: any[]
+	ActivationDetails: unknown[]
 	ActiveEnterTimestamp: number
 	ActiveEnterTimestampMonotonic: number
 	ActiveExitTimestamp: number
@@ -434,12 +435,12 @@ export interface SystemdServiceDetails {
 	AssertResult: boolean
 	AssertTimestamp: number
 	AssertTimestampMonotonic: number
-	Asserts: any[]
+	Asserts: unknown[]
 	Before: string[]
-	BindsTo: any[]
-	BoundBy: any[]
+	BindsTo: unknown[]
+	BoundBy: unknown[]
 	CPUUsageNSec: number
-	CanClean: any[]
+	CanClean: unknown[]
 	CanFreeze: boolean
 	CanIsolate: boolean
 	CanLiveMount: boolean
@@ -450,15 +451,15 @@ export interface SystemdServiceDetails {
 	ConditionResult: boolean
 	ConditionTimestamp: number
 	ConditionTimestampMonotonic: number
-	Conditions: any[]
-	ConflictedBy: any[]
+	Conditions: unknown[]
+	ConflictedBy: unknown[]
 	Conflicts: string[]
-	ConsistsOf: any[]
+	ConsistsOf: unknown[]
 	DebugInvocation: boolean
 	DefaultDependencies: boolean
 	Description: string
 	Documentation: string[]
-	DropInPaths: any[]
+	DropInPaths: unknown[]
 	ExecMainPID: number
 	FailureAction: string
 	FailureActionExitStatus: number
@@ -477,46 +478,46 @@ export interface SystemdServiceDetails {
 	JobTimeoutAction: string
 	JobTimeoutRebootArgument: string
 	JobTimeoutUSec: number
-	JoinsNamespaceOf: any[]
+	JoinsNamespaceOf: unknown[]
 	LoadError: string[]
 	LoadState: string
 	MainPID: number
-	Markers: any[]
+	Markers: unknown[]
 	MemoryCurrent: number
 	MemoryLimit: number
 	MemoryPeak: number
 	NRestarts: number
 	Names: string[]
 	NeedDaemonReload: boolean
-	OnFailure: any[]
+	OnFailure: unknown[]
 	OnFailureJobMode: string
-	OnFailureOf: any[]
-	OnSuccess: any[]
+	OnFailureOf: unknown[]
+	OnSuccess: unknown[]
 	OnSuccessJobMode: string
-	OnSuccessOf: any[]
-	PartOf: any[]
+	OnSuccessOf: unknown[]
+	PartOf: unknown[]
 	Perpetual: boolean
-	PropagatesReloadTo: any[]
-	PropagatesStopTo: any[]
+	PropagatesReloadTo: unknown[]
+	PropagatesStopTo: unknown[]
 	RebootArgument: string
-	Refs: any[]
+	Refs: unknown[]
 	RefuseManualStart: boolean
 	RefuseManualStop: boolean
-	ReloadPropagatedFrom: any[]
-	RequiredBy: any[]
+	ReloadPropagatedFrom: unknown[]
+	RequiredBy: unknown[]
 	Requires: string[]
-	RequiresMountsFor: any[]
-	Requisite: any[]
-	RequisiteOf: any[]
+	RequiresMountsFor: unknown[]
+	Requisite: unknown[]
+	RequisiteOf: unknown[]
 	Result: string
-	SliceOf: any[]
+	SliceOf: unknown[]
 	SourcePath: string
 	StartLimitAction: string
 	StartLimitBurst: number
 	StartLimitIntervalUSec: number
 	StateChangeTimestamp: number
 	StateChangeTimestampMonotonic: number
-	StopPropagatedFrom: any[]
+	StopPropagatedFrom: unknown[]
 	StopWhenUnneeded: boolean
 	SubState: string
 	SuccessAction: string
@@ -526,14 +527,14 @@ export interface SystemdServiceDetails {
 	TasksMax: number
 	Transient: boolean
 	TriggeredBy: string[]
-	Triggers: any[]
+	Triggers: unknown[]
 	UnitFilePreset: string
 	UnitFileState: string
-	UpheldBy: any[]
-	Upholds: any[]
-	WantedBy: any[]
+	UpheldBy: unknown[]
+	Upholds: unknown[]
+	WantedBy: unknown[]
 	Wants: string[]
-	WantsMountsFor: any[]
+	WantsMountsFor: unknown[]
 }
 
 export interface BeszelInfo {
@@ -543,6 +544,16 @@ export interface BeszelInfo {
 }
 
 export interface UpdateInfo {
-	v: string // new version
-	url: string // url to new version
+	v?: string // new version / tag
+	url?: string // package url
+	currentVersion: string
+	image: string
+	currentImageId?: string
+	currentDigest?: string
+	latestDigest?: string
+	updateAvailable: boolean
+	canApply: boolean
+	status: string
+	message: string
+	lastCheck: string
 }

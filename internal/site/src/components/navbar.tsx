@@ -1,8 +1,10 @@
 import { Trans } from "@lingui/react/macro"
 import { getPagePath } from "@nanostores/router"
+import { useStore } from "@nanostores/react"
 import {
 	ContainerIcon,
 	DatabaseBackupIcon,
+	DownloadCloudIcon,
 	HardDriveIcon,
 	LogOutIcon,
 	LogsIcon,
@@ -29,6 +31,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { isAdmin, isReadOnlyUser, logOut, pb } from "@/lib/api"
+import { $newVersion } from "@/lib/stores"
 import { cn, runOnce } from "@/lib/utils"
 import { LangToggle } from "./lang-toggle"
 import { Logo } from "./logo"
@@ -42,6 +45,8 @@ const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
 
 export default function Navbar() {
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+	const updateInfo = useStore($newVersion)
+	const updateAvailable = Boolean(updateInfo?.updateAvailable)
 
 	const AdminLinks = AdminDropdownGroup()
 
@@ -103,7 +108,10 @@ export default function Navbar() {
 								<HardDriveIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
 								<span>S.M.A.R.T.</span>
 							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => navigate(getPagePath($router, "monitoring"))} className="flex items-center">
+							<DropdownMenuItem
+								onClick={() => navigate(getPagePath($router, "monitoring"))}
+								className="flex items-center"
+							>
 								<MonitorIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
 								<Trans>Monitoring</Trans>
 							</DropdownMenuItem>
@@ -114,6 +122,15 @@ export default function Navbar() {
 								<SettingsIcon className="h-4 w-4 me-2.5" />
 								<Trans>Settings</Trans>
 							</DropdownMenuItem>
+							{updateAvailable && (
+								<DropdownMenuItem
+									onClick={() => navigate(getPagePath($router, "settings", { name: "general" }))}
+									className="flex items-center"
+								>
+									<DownloadCloudIcon className="h-4 w-4 me-2.5" />
+									<Trans>Update available</Trans>
+								</DropdownMenuItem>
+							)}
 							{isAdmin() && (
 								<DropdownMenuSub>
 									<DropdownMenuSubTrigger>
@@ -168,7 +185,6 @@ export default function Navbar() {
 					<TooltipContent>
 						<span>S.M.A.R.T.</span>
 					</TooltipContent>
-					<TooltipContent>S.M.A.R.T.</TooltipContent>
 				</Tooltip>
 				<Tooltip>
 					<TooltipTrigger asChild>
@@ -186,6 +202,22 @@ export default function Navbar() {
 				</Tooltip>
 				<LangToggle />
 				<ModeToggle />
+				{updateAvailable && (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Link
+								href={getPagePath($router, "settings", { name: "general" })}
+								aria-label="Update available"
+								className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "text-primary")}
+							>
+								<DownloadCloudIcon className="h-[1.2rem] w-[1.2rem]" />
+							</Link>
+						</TooltipTrigger>
+						<TooltipContent>
+							<Trans>Update available</Trans>
+						</TooltipContent>
+					</Tooltip>
+				)}
 				<Tooltip>
 					<TooltipTrigger asChild>
 						<Link

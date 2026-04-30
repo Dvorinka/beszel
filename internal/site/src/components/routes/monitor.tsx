@@ -32,6 +32,7 @@ import {
 	PlayIcon,
 	TrendingUp,
 	TrendingDown,
+	Plus,
 	type LucideIcon,
 } from "lucide-react"
 import {
@@ -53,6 +54,7 @@ import {
 	createStatusPage,
 	getStatusPageMonitors,
 	getStatusPages,
+	getStatusPageUrl,
 	removeMonitorFromStatusPage,
 } from "@/lib/statuspages"
 import {
@@ -521,36 +523,92 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 				<Card>
 					<CardHeader>
 						<CardTitle>Status Page</CardTitle>
-						<CardDescription>Link or create a public status page</CardDescription>
+						<CardDescription>Link this monitor to public status pages</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-3">
 						{statusPages && statusPages.length > 0 ? (
-							<div className="space-y-2">
+							<div className="space-y-3">
 								{statusPages.map((page) => {
 									const isLinked = linkedStatusPageMonitors?.some((link) => link.status_page_id === page.id) || false
+									const linkInfo = linkedStatusPageMonitors?.find((link) => link.status_page_id === page.id)
+									
 									return (
-										<div key={page.id} className="flex items-center justify-between py-1">
-											<span className="text-sm">{page.name}</span>
-											<Button
-												variant={isLinked ? "default" : "outline"}
-												size="sm"
-												onClick={() => {
-													updateStatusPagesMutation.mutate({
-														pageId: page.id,
-														linked: isLinked,
-													})
-												}}
-											>
-												{isLinked ? "Linked" : "Link"}
-											</Button>
+										<div 
+											key={page.id} 
+											className={`flex items-center justify-between p-3 rounded-lg border ${
+												isLinked ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
+											}`}
+										>
+											<div className="min-w-0 flex-1">
+												<div className="flex items-center gap-2">
+													<span className="font-medium text-sm truncate">{page.name}</span>
+													{page.public && (
+														<Globe className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+													)}
+												</div>
+												{isLinked && linkInfo && (
+													<p className="text-xs text-muted-foreground mt-1">
+														Display: {linkInfo.display_name || monitor?.name}
+														{linkInfo.group && ` • Group: ${linkInfo.group}`}
+													</p>
+												)}
+												{!isLinked && page.public && (
+													<p className="text-xs text-muted-foreground mt-1">
+														{page.monitor_count} monitor{page.monitor_count !== 1 ? 's' : ''} linked
+													</p>
+												)}
+											</div>
+											<div className="flex items-center gap-2 ml-2">
+												{isLinked && page.public && (
+													<Button
+														variant="ghost"
+														size="icon"
+														className="h-8 w-8"
+														asChild
+													>
+														<a
+															href={getStatusPageUrl(page.slug)}
+															target="_blank"
+															rel="noopener noreferrer"
+															title="View public status page"
+														>
+															<ExternalLink className="h-4 w-4" />
+														</a>
+													</Button>
+												)}
+												<Button
+													variant={isLinked ? "default" : "outline"}
+													size="sm"
+													onClick={() => {
+														updateStatusPagesMutation.mutate({
+															pageId: page.id,
+															linked: isLinked,
+														})
+													}}
+													disabled={updateStatusPagesMutation.isPending}
+												>
+													{isLinked ? (
+														<>
+															<CheckCircle2 className="mr-1 h-3 w-3" />
+															Linked
+														</>
+													) : (
+														"Link"
+													)}
+												</Button>
+											</div>
 										</div>
 									)
 								})}
 							</div>
 						) : (
-							<p className="text-sm text-muted-foreground">No status pages yet.</p>
+							<div className="text-center py-4">
+								<p className="text-sm text-muted-foreground">No status pages yet.</p>
+								<p className="text-xs text-muted-foreground mt-1">Create one to share your service status publicly.</p>
+							</div>
 						)}
 						<Button variant="outline" size="sm" className="w-full" onClick={() => setIsCreateStatusPageOpen(true)}>
+							<Plus className="mr-2 h-4 w-4" />
 							Create Status Page
 						</Button>
 					</CardContent>

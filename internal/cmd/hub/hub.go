@@ -53,6 +53,7 @@ func getBaseApp() *pocketbase.PocketBase {
 	}
 	updateCmd.Flags().Bool("china-mirrors", false, "Use mirror (gh.beszel.dev) instead of GitHub")
 	baseApp.RootCmd.AddCommand(updateCmd)
+	baseApp.RootCmd.AddCommand(hub.NewContainerUpdateHelperCmd())
 	// add health command
 	baseApp.RootCmd.AddCommand(newHealthCmd())
 
