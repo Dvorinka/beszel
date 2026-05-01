@@ -4,18 +4,18 @@ import "time"
 
 // StatusPage represents a public status page configuration
 type StatusPage struct {
-	ID          string   `json:"id" db:"id"`
-	Name        string   `json:"name" db:"name"`
-	Slug        string   `json:"slug" db:"slug"`
-	Title       string   `json:"title" db:"title"`
-	Description string   `json:"description" db:"description"`
-	Logo        string   `json:"logo" db:"logo"`
-	Favicon     string   `json:"favicon" db:"favicon"`
-	Theme       string   `json:"theme" db:"theme"` // light, dark, auto
-	CustomCSS   string   `json:"custom_css" db:"custom_css"`
-	Public      bool     `json:"public" db:"public"`
-	ShowUptime  bool     `json:"show_uptime" db:"show_uptime"`
-	UserID      string   `json:"user" db:"user"`
+	ID          string    `json:"id" db:"id"`
+	Name        string    `json:"name" db:"name"`
+	Slug        string    `json:"slug" db:"slug"`
+	Title       string    `json:"title" db:"title"`
+	Description string    `json:"description" db:"description"`
+	Logo        string    `json:"logo" db:"logo"`
+	Favicon     string    `json:"favicon" db:"favicon"`
+	Theme       string    `json:"theme" db:"theme"` // light, dark, auto
+	CustomCSS   string    `json:"custom_css" db:"custom_css"`
+	Public      bool      `json:"public" db:"public"`
+	ShowUptime  bool      `json:"show_uptime" db:"show_uptime"`
+	UserID      string    `json:"user" db:"user"`
 	Created     time.Time `json:"created" db:"created"`
 	Updated     time.Time `json:"updated" db:"updated"`
 }
@@ -31,19 +31,31 @@ type StatusPageMonitor struct {
 	UserID       string `json:"user" db:"user"`
 }
 
+// PublicIncident represents an incident for public display
+type PublicIncident struct {
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Status      string    `json:"status"`
+	Severity    string    `json:"severity"`
+	StartedAt   time.Time `json:"started_at"`
+	ResolvedAt  time.Time `json:"resolved_at,omitempty"`
+}
+
 // PublicStatusPage represents a status page for public viewing
 type PublicStatusPage struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description"`
-	Logo        string                 `json:"logo"`
-	Favicon     string                 `json:"favicon"`
-	Theme       string                 `json:"theme"`
-	CustomCSS   string                 `json:"custom_css,omitempty"`
-	Monitors    []PublicMonitorStatus  `json:"monitors"`
-	OverallStatus string               `json:"overall_status"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	ID            string                `json:"id"`
+	Name          string                `json:"name"`
+	Title         string                `json:"title"`
+	Description   string                `json:"description"`
+	Logo          string                `json:"logo"`
+	Favicon       string                `json:"favicon"`
+	Theme         string                `json:"theme"`
+	CustomCSS     string                `json:"custom_css,omitempty"`
+	Monitors      []PublicMonitorStatus `json:"monitors"`
+	Incidents     []PublicIncident      `json:"incidents"`
+	OverallStatus string                `json:"overall_status"`
+	UpdatedAt     time.Time             `json:"updated_at"`
 }
 
 // PublicMonitorStatus represents a monitor's status for public display
@@ -96,19 +108,19 @@ type StatusPageMonitorRequest struct {
 
 // StatusPageResponse represents a status page response
 type StatusPageResponse struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Slug        string    `json:"slug"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Logo        string    `json:"logo"`
-	Favicon     string    `json:"favicon"`
-	Theme       string    `json:"theme"`
-	Public      bool      `json:"public"`
-	ShowUptime  bool      `json:"show_uptime"`
-	MonitorCount int     `json:"monitor_count"`
-	Created     string    `json:"created"`
-	Updated     string    `json:"updated"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Logo         string `json:"logo"`
+	Favicon      string `json:"favicon"`
+	Theme        string `json:"theme"`
+	Public       bool   `json:"public"`
+	ShowUptime   bool   `json:"show_uptime"`
+	MonitorCount int    `json:"monitor_count"`
+	Created      string `json:"created"`
+	Updated      string `json:"updated"`
 }
 
 // Overall status constants

@@ -99,71 +99,100 @@ export function CalendarView() {
 
 	if (isLoading) {
 		return (
-			<Card>
+			<Card className="w-full">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
-						<CalendarIcon className="h-5 w-5" />
-						Calendar View
+						<CalendarIcon className="h-5 w-5 text-primary" />
+						<span className="animate-pulse">Calendar View</span>
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<div className="h-96 flex items-center justify-center">Loading...</div>
+					<div className="h-96 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+						<div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+						<p className="text-sm">Loading calendar events...</p>
+					</div>
 				</CardContent>
 			</Card>
 		)
 	}
 
+	const today = new Date()
+	const isToday = (day: number) =>
+		day > 0 && today.getDate() === day && today.getMonth() === month && today.getFullYear() === year
+
 	return (
-		<Card>
-			<CardHeader>
-				<div className="flex items-center justify-between">
-					<CardTitle className="flex items-center gap-2">
-						<CalendarIcon className="h-5 w-5" />
-						Calendar View
+		<Card className="w-full">
+			<CardHeader className="pb-4">
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+						<div className="p-2 bg-primary/10 rounded-lg">
+							<CalendarIcon className="h-5 w-5 text-primary" />
+						</div>
+						<span>Calendar View</span>
 					</CardTitle>
 					<div className="flex items-center gap-2">
-						<Button variant="outline" size="icon" onClick={prevMonth}>
+						<Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
 							<ChevronLeft className="h-4 w-4" />
 						</Button>
-						<span className="font-medium min-w-[140px] text-center">
+						<span className="font-semibold min-w-[120px] sm:min-w-[160px] text-center text-sm sm:text-base px-2">
 							{monthNames[month]} {year}
 						</span>
-						<Button variant="outline" size="icon" onClick={nextMonth}>
+						<Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8">
 							<ChevronRight className="h-4 w-4" />
 						</Button>
 					</div>
 				</div>
 			</CardHeader>
-			<CardContent>
-				<div className="grid grid-cols-7 gap-1 text-center text-sm font-medium text-muted-foreground mb-2">
-					<div>Sun</div>
-					<div>Mon</div>
-					<div>Tue</div>
-					<div>Wed</div>
-					<div>Thu</div>
-					<div>Fri</div>
-					<div>Sat</div>
+			<CardContent className="space-y-4">
+				{/* Day headers */}
+				<div className="grid grid-cols-7 gap-0.5 sm:gap-1 text-center text-[10px] sm:text-xs lg:text-sm font-medium text-muted-foreground">
+					{["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+						<div key={i} className="py-1 sm:py-1.5">
+							<span className="hidden sm:inline">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]}</span>
+							<span className="sm:hidden">{d}</span>
+						</div>
+					))}
 				</div>
-				<div className="grid grid-cols-7 gap-1">
+
+				{/* Calendar grid */}
+				<div className="grid grid-cols-7 gap-0.5 sm:gap-1 lg:gap-1.5">
 					{days.map((day, index) => (
 						<div
 							key={index}
-							className={`min-h-[100px] border rounded-lg p-2 ${day.day === 0 ? "bg-muted/30" : "bg-card"}`}
+							className={`
+								min-h-[48px] sm:min-h-[72px] lg:min-h-[96px]
+								border rounded sm:rounded-lg p-0.5 sm:p-1.5 lg:p-2
+								transition-all duration-150
+								${day.day === 0 ? "bg-muted/10 border-transparent" : "bg-card hover:bg-muted/30 hover:shadow-sm"}
+								${isToday(day.day) ? "ring-2 ring-primary ring-offset-1" : ""}
+							`}
 						>
 							{day.day > 0 && (
 								<>
-									<div className="font-medium text-sm mb-1">{day.day}</div>
-									<div className="space-y-1">
-										{day.events.map((event) => (
+									<div className={`
+										font-semibold text-[11px] sm:text-xs lg:text-sm mb-0.5 sm:mb-1
+										${isToday(day.day) ? "text-primary" : ""}
+									`}>
+										{day.day}
+									</div>
+									<div className="space-y-px sm:space-y-0.5">
+										{day.events.slice(0, 2).map((event, idx) => (
 											<Link
 												key={event.id}
 												href={event.link || "/calendar"}
-												className="text-xs p-1 rounded flex items-center gap-1"
+												className="
+													text-[9px] sm:text-[10px] lg:text-xs px-0.5 sm:px-1 py-px sm:py-0.5 rounded
+													flex items-center gap-0.5 sm:gap-1
+													hover:brightness-110 transition-all
+												"
 												style={{ backgroundColor: `${event.color}20`, color: event.color }}
 												title={event.title}
 											>
 												{getEventIcon(event.type)}
-												<span className="truncate">{event.title}</span>
+												<span className="truncate hidden lg:inline">{event.title}</span>
+												{idx === 1 && day.events.length > 2 && (
+													<span className="text-[8px] sm:text-[9px]">+{day.events.length - 2}</span>
+												)}
 											</Link>
 										))}
 									</div>
@@ -172,21 +201,26 @@ export function CalendarView() {
 						</div>
 					))}
 				</div>
+
+				{/* Upcoming Events Section */}
 				<div className="mt-6 border-t pt-4">
-					<div className="mb-3 flex items-center justify-between">
-						<h3 className="text-sm font-semibold">Upcoming</h3>
-						<span className="text-xs text-muted-foreground">Next 12 months from this view</span>
+					<div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+						<h3 className="text-sm font-semibold flex items-center gap-2">
+							<span className="w-1.5 h-4 bg-primary rounded-full" />
+							Upcoming Events
+						</h3>
+						<span className="text-xs text-muted-foreground">Next 12 months</span>
 					</div>
 					{upcomingEvents.length > 0 ? (
-						<div className="grid gap-2 sm:grid-cols-2">
+						<div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
 							{upcomingEvents.map((event) => (
 								<Link
 									key={event.id}
 									href={event.link || "/calendar"}
-									className="flex items-center gap-3 rounded-md border p-3 text-sm hover:bg-muted/50"
+									className="flex items-center gap-3 rounded-lg border p-3 text-sm hover:bg-muted/50 hover:border-primary/30 transition-all"
 								>
 									<div
-										className="flex h-8 w-8 shrink-0 items-center justify-center rounded"
+										className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md shadow-sm"
 										style={{ backgroundColor: `${event.color}20`, color: event.color }}
 									>
 										{getEventIcon(event.type)}
@@ -196,7 +230,12 @@ export function CalendarView() {
 										<div className="text-xs text-muted-foreground">{event.date}</div>
 									</div>
 									{typeof event.days_until === "number" && (
-										<div className="text-xs text-muted-foreground">
+										<div className={`
+											text-xs font-medium px-2 py-1 rounded-full
+											${event.days_until === 0 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : ""}
+											${event.days_until > 0 && event.days_until <= 7 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" : ""}
+											${event.days_until > 7 ? "bg-muted text-muted-foreground" : ""}
+										`}>
 											{event.days_until === 0 ? "Today" : `${event.days_until}d`}
 										</div>
 									)}
@@ -204,27 +243,33 @@ export function CalendarView() {
 							))}
 						</div>
 					) : (
-						<div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-							No upcoming domain, SSL, or incident events found.
+						<div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground text-center">
+							<div className="flex justify-center mb-2">
+								<CalendarIcon className="h-8 w-8 opacity-50" />
+							</div>
+							<p>No upcoming events in the next 12 months</p>
+							<p className="text-xs mt-1">Domain expiries, SSL renewals, and incidents will appear here</p>
 						</div>
 					)}
 				</div>
-				<div className="mt-4 flex flex-wrap gap-4 text-sm">
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded bg-red-500" />
-						<span>Domain Expiring (&lt; 7 days)</span>
+
+				{/* Legend */}
+				<div className="mt-4 flex flex-wrap gap-3 text-xs sm:text-sm">
+					<div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/20">
+						<div className="w-2 h-2 rounded-full bg-red-500" />
+						<span className="text-red-700 dark:text-red-400 font-medium">&lt; 7 days</span>
 					</div>
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded bg-orange-500" />
-						<span>Domain Expiring (&lt; 30 days)</span>
+					<div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-900/20">
+						<div className="w-2 h-2 rounded-full bg-orange-500" />
+						<span className="text-orange-700 dark:text-orange-400 font-medium">&lt; 30 days</span>
 					</div>
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded bg-purple-500" />
-						<span>SSL Expiry</span>
+					<div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/20">
+						<div className="w-2 h-2 rounded-full bg-purple-500" />
+						<span className="text-purple-700 dark:text-purple-400 font-medium">SSL Expiry</span>
 					</div>
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded bg-gray-500" />
-						<span>Incident</span>
+					<div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-900/20">
+						<div className="w-2 h-2 rounded-full bg-gray-500" />
+						<span className="text-gray-700 dark:text-gray-400 font-medium">Incident</span>
 					</div>
 				</div>
 			</CardContent>

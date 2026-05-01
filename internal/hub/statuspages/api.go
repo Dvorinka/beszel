@@ -392,6 +392,23 @@ func (h *APIHandler) buildPublicStatusPage(record *core.Record) *statuspage.Publ
 		})
 	}
 
+	// Get active incidents for this user (not closed)
+	var publicIncidents []statuspage.PublicIncident
+	incidentRecords, _ := h.app.FindAllRecords("incidents",
+		dbx.NewExp("user = {:user} && status != {:status}",
+			dbx.Params{"user": record.GetString("user"), "status": "closed"}),
+	)
+	for _, incident := range incidentRecords {
+		publicIncidents = append(publicIncidents, statuspage.PublicIncident{
+			ID:          incident.Id,
+			Title:       incident.GetString("title"),
+			Description: incident.GetString("description"),
+			Status:      incident.GetString("status"),
+			Severity:    incident.GetString("severity"),
+			StartedAt:   incident.GetDateTime("started_at").Time(),
+		})
+	}
+
 	return &statuspage.PublicStatusPage{
 		ID:            record.Id,
 		Name:          record.GetString("name"),
@@ -402,6 +419,7 @@ func (h *APIHandler) buildPublicStatusPage(record *core.Record) *statuspage.Publ
 		Theme:         record.GetString("theme"),
 		CustomCSS:     record.GetString("custom_css"),
 		Monitors:      publicMonitors,
+		Incidents:     publicIncidents,
 		OverallStatus: overallStatus,
 		UpdatedAt:     record.GetDateTime("updated").Time(),
 	}

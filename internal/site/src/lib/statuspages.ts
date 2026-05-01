@@ -29,8 +29,8 @@ export interface StatusPageMonitor {
 export interface PublicMonitorStatus {
 	id: string
 	name: string
-	display_name: string
-	group: string
+	display_name?: string
+	group?: string
 	status: string
 	uptime_24h: number
 	uptime_7d: number
@@ -38,16 +38,27 @@ export interface PublicMonitorStatus {
 	last_check: string
 }
 
+export interface PublicIncident {
+	id: string
+	title: string
+	description: string
+	status: string
+	severity: string
+	started_at: string
+	resolved_at?: string
+}
+
 export interface PublicStatusPage {
 	id: string
 	name: string
 	title: string
 	description: string
-	logo: string
-	favicon: string
-	theme: StatusPageTheme
+	logo?: string
+	favicon?: string
+	theme?: string
 	custom_css?: string
 	monitors: PublicMonitorStatus[]
+	incidents: PublicIncident[]
 	overall_status: string
 	updated_at: string
 }

@@ -115,8 +115,26 @@ func (s *Scheduler) checkDomain(record *core.Record) error {
 
 	newData, err := s.whois.LookupDomain(ctx, domainName)
 	if err != nil {
-		log.Printf("[domain-scheduler] Failed to lookup %s: %v", domainName, err)
-		return err
+		log.Printf("[domain-scheduler] WHOIS lookup failed for %s: %v", domainName, err)
+		// Don't return early - try DNS resolution independently to verify domain is alive
+		newData = &domain.Domain{DomainName: domainName}
+	}
+
+	// Independent DNS resolution check: if WHOIS failed, try to resolve the domain directly
+	if err != nil {
+		ips, lookupErr := net.LookupHost(domainName)
+		if lookupErr == nil && len(ips) > 0 {
+			newData.IPv4Addresses = []string{}
+			newData.IPv6Addresses = []string{}
+			for _, ip := range ips {
+				if strings.Contains(ip, ":") {
+					newData.IPv6Addresses = append(newData.IPv6Addresses, ip)
+				} else {
+					newData.IPv4Addresses = append(newData.IPv4Addresses, ip)
+				}
+			}
+			log.Printf("[domain-scheduler] DNS resolution succeeded for %s despite WHOIS failure", domainName)
+		}
 	}
 
 	oldRecord := record.Fresh()
@@ -263,7 +281,20 @@ func (s *Scheduler) checkDomain(record *core.Record) error {
 			status = domain.DomainStatusActive
 		}
 	} else {
-		status = domain.DomainStatusUnknown
+		// No expiry date from WHOIS - determine status from DNS resolution.
+		hasDNS := len(newData.IPv4Addresses) > 0 || len(newData.IPv6Addresses) > 0 || len(newData.NameServers) > 0
+		if hasDNS {
+			// DNS resolves means the domain is active and functioning.
+			// If we previously had a valid status (active/expiring), keep it.
+			// If status was unknown or empty, upgrade to active since DNS proves the domain exists.
+			if status == domain.DomainStatusUnknown || status == "" {
+				status = domain.DomainStatusActive
+			}
+			// Otherwise keep the existing valid status (active/expiring)
+		} else {
+			// No DNS resolution and no expiry date - we can't determine the domain's state
+			status = domain.DomainStatusUnknown
+		}
 	}
 	record.Set("status", status)
 

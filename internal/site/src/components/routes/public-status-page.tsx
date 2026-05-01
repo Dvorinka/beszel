@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { getPublicStatusPage, type PublicStatusPage, type PublicMonitorStatus } from "@/lib/statuspages"
+import { getPublicStatusPage, type PublicStatusPage, type PublicMonitorStatus, type PublicIncident } from "@/lib/statuspages"
 import { Activity, CheckCircle2, XCircle, AlertTriangle, Clock, Shield, RefreshCw } from "lucide-react"
 
 // Status configurations with colors matching github-statuses design
@@ -388,6 +388,61 @@ export default function PublicStatusPage({ slug }: { slug: string }) {
 						</div>
 					</div>
 				</section>
+
+				{/* Active Incidents */}
+				{data.incidents && data.incidents.length > 0 && (
+					<section className="sp-incidents-section">
+						<div className="sp-group-header">
+							<h3 className="sp-group-title">Active Incidents</h3>
+						</div>
+						<div className="sp-incidents-list">
+							{data.incidents.map((incident) => (
+								<div
+									key={incident.id}
+									className="sp-incident-card"
+									style={{
+										backgroundColor:
+											incident.severity === "critical"
+												? "rgba(239, 68, 68, 0.1)"
+												: incident.severity === "high"
+													? "rgba(249, 115, 22, 0.1)"
+													: "rgba(234, 179, 8, 0.1)",
+										borderLeft:
+											incident.severity === "critical"
+												? "4px solid #ef4444"
+												: incident.severity === "high"
+													? "4px solid #f97316"
+													: "4px solid #eab308",
+									}}
+								>
+									<div className="sp-incident-header">
+										<AlertTriangle
+											className="sp-incident-icon"
+											style={{
+												color:
+													incident.severity === "critical"
+														? "#ef4444"
+														: incident.severity === "high"
+															? "#f97316"
+															: "#eab308",
+											}}
+										/>
+										<span className="sp-incident-status" style={{ textTransform: "capitalize" }}>
+											{incident.status}
+										</span>
+									</div>
+									<h4 className="sp-incident-title">{incident.title}</h4>
+									{incident.description && (
+										<p className="sp-incident-description">{incident.description}</p>
+									)}
+									<span className="sp-incident-time">
+										Started: {new Date(incident.started_at).toLocaleString()}
+									</span>
+								</div>
+							))}
+						</div>
+					</section>
+				)}
 
 				{/* Monitor Groups */}
 				{groupNames.map((groupName) => (

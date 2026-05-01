@@ -2,6 +2,7 @@ package monitors
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -251,6 +252,13 @@ func (h *APIHandler) createMonitor(e *core.RequestEvent) error {
 	// Add to scheduler
 	h.scheduler.AddMonitor(record)
 
+	// Run initial check immediately so the monitor shows real status instead of pending
+	go func() {
+		if _, err := h.scheduler.RunManualCheck(record.Id); err != nil {
+			log.Printf("[monitor-api] Initial check failed for %s: %v", record.Id, err)
+		}
+	}()
+
 	return e.JSON(http.StatusCreated, recordToResponse(record))
 }
 
@@ -484,6 +492,13 @@ func (h *APIHandler) resumeMonitor(e *core.RequestEvent) error {
 	}
 
 	h.scheduler.UpdateMonitor(record)
+
+	// Run an immediate check so the monitor shows real status instead of pending
+	go func() {
+		if _, err := h.scheduler.RunManualCheck(record.Id); err != nil {
+			log.Printf("[monitor-api] Resume check failed for %s: %v", record.Id, err)
+		}
+	}()
 
 	return e.JSON(http.StatusOK, recordToResponse(record))
 }

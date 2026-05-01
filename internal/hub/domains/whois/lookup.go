@@ -177,7 +177,10 @@ func (s *LookupService) tryRDAP(ctx context.Context, domainName string) (*domain
 	// Parse events
 	var creationDate, expiryDate, updatedDate *time.Time
 	for _, event := range rdapResp.Events {
-		t, _ := time.Parse(time.RFC3339, event.EventDate)
+		t, err := time.Parse(time.RFC3339, event.EventDate)
+		if err != nil || t.IsZero() {
+			continue
+		}
 		switch event.EventAction {
 		case "registration":
 			creationDate = &t
@@ -831,8 +834,11 @@ func hasValidData(data *domain.WHOISData) bool {
 	if data == nil {
 		return false
 	}
-	// Accept if we got any meaningful data
-	if data.Dates.ExpiryDate != nil || data.Dates.CreationDate != nil {
+	// Accept if we got any meaningful date (non-nil and not zero)
+	if data.Dates.ExpiryDate != nil && !data.Dates.ExpiryDate.IsZero() {
+		return true
+	}
+	if data.Dates.CreationDate != nil && !data.Dates.CreationDate.IsZero() {
 		return true
 	}
 	if data.Registrar.Name != "" && data.Registrar.Name != "Unknown" {

@@ -23,6 +23,7 @@ import {
 	FilterIcon,
 	LayoutGridIcon,
 	LayoutListIcon,
+	PlusIcon,
 	Settings2Icon,
 	XIcon,
 } from "lucide-react"
@@ -49,6 +50,7 @@ import AlertButton from "../alerts/alert-button"
 import { $router, Link } from "../router"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { SystemsTableColumns, ActionsButton, IndicatorDot } from "./systems-table-columns"
+import { AddSystemDialog } from "../add-system"
 
 type ViewMode = "table" | "grid"
 type StatusFilter = "all" | SystemRecord["status"]
@@ -62,6 +64,7 @@ export default function SystemsTable() {
 	const pausedSystems = $pausedSystems.get()
 	const { i18n, t } = useLingui()
 	const [filter, setFilter] = useState<string>("")
+	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
 	const [sorting, setSorting] = useBrowserStorage<SortingState>(
 		"sortMode",
@@ -146,6 +149,10 @@ export default function SystemsTable() {
 					</div>
 
 					<div className="flex gap-2 ms-auto w-full md:w-80">
+						<Button onClick={() => setIsAddDialogOpen(true)} className="shrink-0">
+							<PlusIcon className="mr-2 h-4 w-4" />
+							<Trans>Add System</Trans>
+						</Button>
 						<div className="relative flex-1">
 							<Input
 								placeholder={t`Filter...`}
@@ -302,28 +309,31 @@ export default function SystemsTable() {
 	])
 
 	return (
-		<Card className="w-full px-3 py-5 sm:py-6 sm:px-6">
-			{CardHead}
-			{viewMode === "table" ? (
-				// table layout
-				<div className="rounded-md">
-					<AllSystemsTable table={table} rows={rows} colLength={visibleColumns.length} />
-				</div>
-			) : (
-				// grid layout
-				<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-					{rows?.length ? (
-						rows.map((row) => {
-							return <SystemCard key={row.original.id} row={row} table={table} colLength={visibleColumns.length} />
-						})
-					) : (
-						<div className="col-span-full text-center py-8">
-							<Trans>No systems found.</Trans>
-						</div>
-					)}
-				</div>
-			)}
-		</Card>
+		<>
+			<Card className="w-full px-3 py-5 sm:py-6 sm:px-6">
+				{CardHead}
+				{viewMode === "table" ? (
+					// table layout
+					<div className="rounded-md">
+						<AllSystemsTable table={table} rows={rows} colLength={visibleColumns.length} />
+					</div>
+				) : (
+					// grid layout
+					<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+						{rows?.length ? (
+							rows.map((row) => {
+								return <SystemCard key={row.original.id} row={row} table={table} colLength={visibleColumns.length} />
+							})
+						) : (
+							<div className="col-span-full text-center py-8">
+								<Trans>No systems found.</Trans>
+							</div>
+						)}
+					</div>
+				)}
+			</Card>
+			<AddSystemDialog open={isAddDialogOpen} setOpen={setIsAddDialogOpen} />
+		</>
 	)
 }
 

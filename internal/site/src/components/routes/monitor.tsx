@@ -264,7 +264,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 		}
 		const cutoff = now - (ranges[timeRange] || ranges["24h"])
 		return heartbeats.filter((h: HeartbeatRow) => {
-			const t = new Date(h.time || h.timestamp).getTime()
+			const t = new Date(h.time || h.timestamp || "").getTime()
 			return t >= cutoff
 		})
 	}, [heartbeats, timeRange])
@@ -276,7 +276,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 			.slice()
 			.reverse()
 			.map((h: HeartbeatRow) => ({
-				time: new Date(h.time || h.timestamp).toLocaleTimeString(),
+				time: new Date(h.time || h.timestamp || "").toLocaleTimeString(),
 				responseTime: h.ping || 0,
 				status: h.status === "up" ? 1 : 0,
 			}))
@@ -413,6 +413,36 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 					icon={Clock}
 				/>
 			</div>
+
+			{/* Pending / No Data State */}
+			{monitor.status === "pending" && !heartbeats?.length && (
+				<Card className="border-yellow-500/20 bg-yellow-50/5 dark:bg-yellow-950/10">
+					<CardContent className="p-6">
+						<div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+							<div className="flex items-center gap-3">
+								<div className="p-2 bg-yellow-500/10 rounded-lg">
+									<Clock className="h-5 w-5 text-yellow-500" />
+								</div>
+								<div>
+									<p className="font-medium">Initial check pending</p>
+									<p className="text-sm text-muted-foreground">
+										This monitor has not been checked yet. Click "Check Now" to run the first check.
+									</p>
+								</div>
+							</div>
+							<Button
+								variant="default"
+								size="sm"
+								onClick={() => checkMutation.mutate()}
+								disabled={checkMutation.isPending}
+							>
+								<RefreshCw className={cn("mr-2 h-4 w-4", checkMutation.isPending && "animate-spin")} />
+								<Trans>Check Now</Trans>
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* Combined Uptime & Response Chart */}
 			<Card>

@@ -390,9 +390,15 @@ func (s *Scheduler) AddMonitor(record *core.Record) {
 func (s *Scheduler) UpdateMonitor(record *core.Record) {
 	m := recordToMonitor(record)
 
-	// Get existing scheduled monitor to preserve next check time if appropriate
+	// Get existing scheduled monitor
 	if sm, ok := s.monitors.GetOk(m.ID); ok {
 		sm.mu.Lock()
+		wasPaused := sm.Monitor.Status == monitor.StatusPaused || !sm.Monitor.Active
+		nowActive := m.Active && m.Status != monitor.StatusPaused
+		// If monitor just became active (resumed), reset NextCheck so it's checked immediately
+		if wasPaused && nowActive {
+			sm.NextCheck = time.Now()
+		}
 		sm.Monitor = m
 		sm.mu.Unlock()
 	} else {
