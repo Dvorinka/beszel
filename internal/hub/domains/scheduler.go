@@ -120,20 +120,31 @@ func (s *Scheduler) checkDomain(record *core.Record) error {
 		newData = &domain.Domain{DomainName: domainName}
 	}
 
-	// Independent DNS resolution check: if WHOIS failed, try to resolve the domain directly
-	if err != nil {
-		ips, lookupErr := net.LookupHost(domainName)
-		if lookupErr == nil && len(ips) > 0 {
-			newData.IPv4Addresses = []string{}
-			newData.IPv6Addresses = []string{}
-			for _, ip := range ips {
-				if strings.Contains(ip, ":") {
-					newData.IPv6Addresses = append(newData.IPv6Addresses, ip)
-				} else {
-					newData.IPv4Addresses = append(newData.IPv4Addresses, ip)
-				}
+	// Always perform independent DNS resolution to verify domain is alive.
+	// This is critical when WHOIS succeeds but returns partial data (e.g. no expiry for some TLDs),
+	// or when WHOIS fails completely. DNS resolution proves the domain exists and is active.
+	ips, lookupErr := net.LookupHost(domainName)
+	if lookupErr == nil && len(ips) > 0 {
+		newData.IPv4Addresses = []string{}
+		newData.IPv6Addresses = []string{}
+		for _, ip := range ips {
+			if strings.Contains(ip, ":") {
+				newData.IPv6Addresses = append(newData.IPv6Addresses, ip)
+			} else {
+				newData.IPv4Addresses = append(newData.IPv4Addresses, ip)
 			}
-			log.Printf("[domain-scheduler] DNS resolution succeeded for %s despite WHOIS failure", domainName)
+		}
+		log.Printf("[domain-scheduler] DNS A/AAAA resolution succeeded for %s", domainName)
+	}
+
+	// Also try to get nameservers independently if WHOIS didn't provide them
+	if len(newData.NameServers) == 0 {
+		nsRecords, nsErr := net.LookupNS(domainName)
+		if nsErr == nil && len(nsRecords) > 0 {
+			for _, ns := range nsRecords {
+				newData.NameServers = append(newData.NameServers, ns.Host)
+			}
+			log.Printf("[domain-scheduler] DNS NS lookup succeeded for %s", domainName)
 		}
 	}
 

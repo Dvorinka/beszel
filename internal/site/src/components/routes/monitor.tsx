@@ -318,6 +318,10 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 
 	const isUp = monitor.status === "up"
 	const isPaused = monitor.status === "paused"
+	const isPending = monitor.status === "pending"
+
+	const headerIconColor = isUp ? "text-green-500" : isPaused ? "text-gray-500" : isPending ? "text-yellow-500" : "text-red-500"
+	const headerBgColor = isUp ? "bg-green-500/10" : isPaused ? "bg-gray-500/10" : isPending ? "bg-yellow-500/10" : "bg-red-500/10"
 
 	return (
 		<div className="grid gap-4 mb-14">
@@ -329,32 +333,35 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 							<div
 								className={cn(
 									"h-12 w-12 rounded-full flex items-center justify-center",
-									isUp ? "bg-green-500/10" : isPaused ? "bg-gray-500/10" : "bg-red-500/10"
+									headerBgColor
 								)}
 							>
-								<Globe
-									className={cn("h-6 w-6", isUp ? "text-green-500" : isPaused ? "text-gray-500" : "text-red-500")}
-								/>
+								<Globe className={cn("h-6 w-6", headerIconColor)} />
 							</div>
 							<div>
 								<h1 className="text-2xl font-bold">{monitor.name}</h1>
-								<div className="flex items-center gap-2 mt-1">
+								<div className="flex items-center gap-2 mt-1 flex-wrap">
 									<StatusBadge status={monitor.status} />
 									<Badge variant="secondary">{getMonitorTypeLabel(monitor.type)}</Badge>
 									{monitor.interval && <Badge variant="outline">{monitor.interval}s interval</Badge>}
+									{isPending && (
+										<Badge variant="outline" className="text-yellow-600 border-yellow-500/30">
+											Waiting for first check
+										</Badge>
+									)}
 								</div>
 								{monitor.url && <p className="text-sm text-muted-foreground mt-1">{monitor.url}</p>}
 							</div>
 						</div>
 						<div className="flex items-center gap-2 flex-wrap">
 							<Button
-								variant="outline"
+								variant={isPending ? "default" : "outline"}
 								size="sm"
 								onClick={() => checkMutation.mutate()}
 								disabled={checkMutation.isPending || isPaused}
 							>
 								<RefreshCw className={cn("mr-2 h-4 w-4", checkMutation.isPending && "animate-spin")} />
-								<Trans>Check Now</Trans>
+								{isPending ? "Run First Check" : "Check Now"}
 							</Button>
 							{monitor.url && (
 								<Button variant="outline" size="sm" asChild>
@@ -413,36 +420,6 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 					icon={Clock}
 				/>
 			</div>
-
-			{/* Pending / No Data State */}
-			{monitor.status === "pending" && !heartbeats?.length && (
-				<Card className="border-yellow-500/20 bg-yellow-50/5 dark:bg-yellow-950/10">
-					<CardContent className="p-6">
-						<div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-							<div className="flex items-center gap-3">
-								<div className="p-2 bg-yellow-500/10 rounded-lg">
-									<Clock className="h-5 w-5 text-yellow-500" />
-								</div>
-								<div>
-									<p className="font-medium">Initial check pending</p>
-									<p className="text-sm text-muted-foreground">
-										This monitor has not been checked yet. Click "Check Now" to run the first check.
-									</p>
-								</div>
-							</div>
-							<Button
-								variant="default"
-								size="sm"
-								onClick={() => checkMutation.mutate()}
-								disabled={checkMutation.isPending}
-							>
-								<RefreshCw className={cn("mr-2 h-4 w-4", checkMutation.isPending && "animate-spin")} />
-								<Trans>Check Now</Trans>
-							</Button>
-						</div>
-					</CardContent>
-				</Card>
-			)}
 
 			{/* Combined Uptime & Response Chart */}
 			<Card>
@@ -511,8 +488,26 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 								</ComposedChart>
 							</ResponsiveContainer>
 						) : (
-							<div className="h-full flex items-center justify-center text-muted-foreground">
-								<Trans>No data available for selected time range</Trans>
+							<div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
+								<div className="p-3 bg-muted/50 rounded-full">
+									<Activity className="h-6 w-6 opacity-50" />
+								</div>
+								<p className="text-sm">
+									{isPending
+										? "No check data yet. Run a check to see the chart."
+										: "No data available for selected time range"}
+								</p>
+								{isPending && (
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => checkMutation.mutate()}
+										disabled={checkMutation.isPending}
+									>
+										<RefreshCw className={cn("mr-2 h-4 w-4", checkMutation.isPending && "animate-spin")} />
+										Run First Check
+									</Button>
+									)}
 							</div>
 						)}
 					</div>
@@ -672,12 +667,32 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 								</TableRow>
 							))}
 							{!heartbeats?.length && (
-								<TableRow>
-									<TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-										No check history available
-									</TableCell>
-								</TableRow>
-							)}
+							<TableRow>
+								<TableCell colSpan={4}>
+									<div className="flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
+										<div className="p-2 bg-muted/50 rounded-full">
+											<Clock className="h-5 w-5 opacity-50" />
+										</div>
+										<p className="text-sm">
+											{isPending
+												? "No checks have been run yet."
+												: "No check history available for the selected period."}
+										</p>
+										{isPending && (
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => checkMutation.mutate()}
+												disabled={checkMutation.isPending}
+											>
+												<RefreshCw className={cn("mr-2 h-4 w-4", checkMutation.isPending && "animate-spin")} />
+												Run First Check
+											</Button>
+										)}
+									</div>
+								</TableCell>
+							</TableRow>
+						)}
 						</TableBody>
 					</Table>
 				</CardContent>

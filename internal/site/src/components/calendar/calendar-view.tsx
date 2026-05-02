@@ -131,6 +131,9 @@ export function CalendarView() {
 						<span>Calendar View</span>
 					</CardTitle>
 					<div className="flex items-center gap-2">
+						<Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8 text-xs">
+							Today
+						</Button>
 						<Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
 							<ChevronLeft className="h-4 w-4" />
 						</Button>
@@ -161,37 +164,55 @@ export function CalendarView() {
 							key={index}
 							className={`
 								min-h-[48px] sm:min-h-[72px] lg:min-h-[96px]
-								border rounded sm:rounded-lg p-0.5 sm:p-1.5 lg:p-2
+								border rounded-md sm:rounded-lg p-0.5 sm:p-1.5 lg:p-2
 								transition-all duration-150
-								${day.day === 0 ? "bg-muted/10 border-transparent" : "bg-card hover:bg-muted/30 hover:shadow-sm"}
-								${isToday(day.day) ? "ring-2 ring-primary ring-offset-1" : ""}
+								${day.day === 0 ? "bg-muted/5 border-transparent" : "bg-card hover:bg-muted/30 hover:shadow-sm"}
+								${isToday(day.day) ? "ring-2 ring-primary/70 ring-offset-1 bg-primary/5" : ""}
 							`}
 						>
 							{day.day > 0 && (
 								<>
 									<div className={`
-										font-semibold text-[11px] sm:text-xs lg:text-sm mb-0.5 sm:mb-1
-										${isToday(day.day) ? "text-primary" : ""}
+										text-[11px] sm:text-xs lg:text-sm mb-0.5 sm:mb-1
+										${isToday(day.day)
+											? "flex items-center justify-center"
+											: "font-medium text-muted-foreground"
+										}
 									`}>
-										{day.day}
+										{isToday(day.day) ? (
+											<span className="inline-flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] sm:text-xs font-bold">
+												{day.day}
+											</span>
+										) : (
+											day.day
+										)}
 									</div>
-									<div className="space-y-px sm:space-y-0.5">
+									<div className="space-y-0.5 sm:space-y-1">
 										{day.events.slice(0, 2).map((event, idx) => (
 											<Link
 												key={event.id}
 												href={event.link || "/calendar"}
 												className="
-													text-[9px] sm:text-[10px] lg:text-xs px-0.5 sm:px-1 py-px sm:py-0.5 rounded
-													flex items-center gap-0.5 sm:gap-1
-													hover:brightness-110 transition-all
+													text-[9px] sm:text-[10px] lg:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full
+													flex items-center gap-1 sm:gap-1.5
+													hover:scale-[1.02] transition-all shadow-sm
 												"
-												style={{ backgroundColor: `${event.color}20`, color: event.color }}
+												style={{
+													backgroundColor: `${event.color}18`,
+													color: event.color,
+													border: `1px solid ${event.color}30`,
+												}}
 												title={event.title}
 											>
 												{getEventIcon(event.type)}
-												<span className="truncate hidden lg:inline">{event.title}</span>
+												<span className="truncate hidden sm:inline max-w-[70px] lg:max-w-[110px] font-medium">{event.title}</span>
 												{idx === 1 && day.events.length > 2 && (
-													<span className="text-[8px] sm:text-[9px]">+{day.events.length - 2}</span>
+													<span
+														className="text-[8px] sm:text-[9px] shrink-0 font-bold px-1 rounded-full"
+														style={{ backgroundColor: `${event.color}30`, color: event.color }}
+													>
+														+{day.events.length - 2}
+													</span>
 												)}
 											</Link>
 										))}

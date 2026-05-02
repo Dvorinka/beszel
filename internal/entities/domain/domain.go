@@ -25,6 +25,8 @@ type Domain struct {
 	NameServers []string `json:"name_servers" db:"name_servers"`
 	MXRecords   []string `json:"mx_records" db:"mx_records"`
 	TXTRecords  []string `json:"txt_records" db:"txt_records"`
+	CNAMERecord string   `json:"cname_record" db:"cname_record"`
+	SRVRecords  []string `json:"srv_records" db:"srv_records"`
 
 	// IP Addresses
 	IPv4Addresses []string `json:"ipv4_addresses" db:"ipv4_addresses"`

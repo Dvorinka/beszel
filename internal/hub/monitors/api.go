@@ -252,12 +252,16 @@ func (h *APIHandler) createMonitor(e *core.RequestEvent) error {
 	// Add to scheduler
 	h.scheduler.AddMonitor(record)
 
-	// Run initial check immediately so the monitor shows real status instead of pending
-	go func() {
-		if _, err := h.scheduler.RunManualCheck(record.Id); err != nil {
-			log.Printf("[monitor-api] Initial check failed for %s: %v", record.Id, err)
-		}
-	}()
+	// Run initial check synchronously so the monitor shows real status immediately
+	if _, err := h.scheduler.RunManualCheck(record.Id); err != nil {
+		log.Printf("[monitor-api] Initial check failed for %s: %v", record.Id, err)
+	}
+
+	// Re-fetch the updated record to get the new status
+	updatedRecord, err := h.app.FindRecordById("monitors", record.Id)
+	if err == nil {
+		record = updatedRecord
+	}
 
 	return e.JSON(http.StatusCreated, recordToResponse(record))
 }
@@ -494,11 +498,15 @@ func (h *APIHandler) resumeMonitor(e *core.RequestEvent) error {
 	h.scheduler.UpdateMonitor(record)
 
 	// Run an immediate check so the monitor shows real status instead of pending
-	go func() {
-		if _, err := h.scheduler.RunManualCheck(record.Id); err != nil {
-			log.Printf("[monitor-api] Resume check failed for %s: %v", record.Id, err)
-		}
-	}()
+	if _, err := h.scheduler.RunManualCheck(record.Id); err != nil {
+		log.Printf("[monitor-api] Resume check failed for %s: %v", record.Id, err)
+	}
+
+	// Re-fetch the updated record to get the new status
+	updatedRecord, err := h.app.FindRecordById("monitors", record.Id)
+	if err == nil {
+		record = updatedRecord
+	}
 
 	return e.JSON(http.StatusOK, recordToResponse(record))
 }

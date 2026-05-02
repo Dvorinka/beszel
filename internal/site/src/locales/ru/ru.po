@@ -97,6 +97,10 @@ msgstr "5 мин"
 msgid "8.8.8.8"
 msgstr ""
 
+#: src/components/routes/incidents.tsx
+msgid "Acknowledge"
+msgstr ""
+
 #. Table column
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -130,9 +134,9 @@ msgstr "Активные оповещения"
 msgid "Active state"
 msgstr "Активное состояние"
 
-#: src/components/monitors-table/monitors-table.tsx
-#~ msgid "Add"
-#~ msgstr ""
+#: src/components/routes/incidents.tsx
+msgid "Add"
+msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/add-system.tsx
@@ -151,8 +155,8 @@ msgid "Add Monitor"
 msgstr ""
 
 #: src/components/systems-table/systems-table.tsx
-#~ msgid "Add System"
-#~ msgstr ""
+msgid "Add System"
+msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
@@ -460,6 +464,7 @@ msgid "Check now"
 msgstr ""
 
 #: src/components/routes/monitor.tsx
+#: src/components/routes/monitor.tsx
 msgid "Check Now"
 msgstr ""
 
@@ -492,6 +497,10 @@ msgstr "Нажмите на систему для просмотра допол�
 #: src/components/ui/input-copy.tsx
 msgid "Click to copy"
 msgstr "Нажмите, чтобы скопировать"
+
+#: src/components/routes/incidents.tsx
+msgid "Close"
+msgstr ""
 
 #: src/components/systems-table/systems-table.tsx
 #~ msgid "Columns"
@@ -621,6 +630,7 @@ msgstr "Распределение времени ЦП"
 msgid "CPU Usage"
 msgstr "Использование CPU"
 
+#: src/components/routes/incidents.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Create"
 msgstr "Создать"
@@ -629,14 +639,26 @@ msgstr "Создать"
 msgid "Create account"
 msgstr "Создать аккаунт"
 
+#: src/components/routes/incidents.tsx
+msgid "Create Incident"
+msgstr ""
+
 #: src/components/monitors-table/add-monitor-dialog.tsx
 msgid "Create Monitor"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "Create New Incident"
 msgstr ""
 
 #. Context: date created
 #: src/components/alerts-history-columns.tsx
 msgid "Created"
 msgstr "Создано"
+
+#: src/components/routes/incidents.tsx
+msgid "Creating..."
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 msgid "Critical (%)"
@@ -721,6 +743,10 @@ msgstr "Описание"
 msgid "Detail"
 msgstr "Подробности"
 
+#: src/components/routes/incidents.tsx
+msgid "Details"
+msgstr ""
+
 #: src/components/routes/system/smart-table.tsx
 msgid "Device"
 msgstr "Устройство"
@@ -788,11 +814,17 @@ msgid "Domain and SSL expiry calendar"
 msgstr ""
 
 #: src/components/domains-table/domains-table.tsx
+#: src/components/routes/home.tsx
+#: src/components/routes/monitoring.tsx
 msgid "Domain Monitoring"
 msgstr ""
 
 #: src/components/command-palette.tsx
 msgid "Domains"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "Done"
 msgstr ""
 
 #. Context: System is down
@@ -1318,6 +1350,10 @@ msgstr ""
 msgid "Manual setup instructions"
 msgstr "Инструкции по ручной настройке"
 
+#: src/components/routes/incidents.tsx
+msgid "Manually create an incident for tracking"
+msgstr ""
+
 #. Chart select field. Please try to keep this short.
 #: src/components/routes/system/chart-card.tsx
 msgid "Max 1 min"
@@ -1371,12 +1407,14 @@ msgid "Monitor updated successfully"
 msgstr ""
 
 #: src/components/monitors-table/monitors-table.tsx
+#: src/components/routes/home.tsx
 msgid "Monitor websites, APIs, and services"
 msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 #: src/components/navbar.tsx
+#: src/components/routes/monitoring.tsx
 msgid "Monitoring"
 msgstr ""
 
@@ -1434,6 +1472,10 @@ msgstr "Нет"
 
 #: src/components/routes/monitor.tsx
 msgid "No data available for selected time range"
+msgstr ""
+
+#: src/components/routes/incidents.tsx
+msgid "No incidents found."
 msgstr ""
 
 #: src/components/monitors-table/monitors-table.tsx
@@ -1748,6 +1790,10 @@ msgstr "Требует"
 msgid "Reset Password"
 msgstr "Сбросить пароль"
 
+#: src/components/routes/incidents.tsx
+msgid "Resolve"
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -1958,6 +2004,8 @@ msgstr "Состояние"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/domains-table/domains-table.tsx
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/routes/system/smart-table.tsx
@@ -2016,6 +2064,10 @@ msgstr "Система"
 msgid "System load averages over time"
 msgstr "Средняя загрузка системы за время"
 
+#: src/components/routes/home.tsx
+msgid "System Monitoring"
+msgstr ""
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
 msgstr "Сервисы Systemd"
@@ -2038,6 +2090,10 @@ msgstr "Таблица"
 msgctxt "Tabs system layout option"
 msgid "Tabs"
 msgstr "Вкладки"
+
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Tags"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Tasks"
@@ -2157,8 +2213,21 @@ msgstr ""
 msgid "Total: {0}"
 msgstr "Всего: {0}"
 
+#: src/components/routes/home.tsx
+#: src/components/routes/monitoring.tsx
+msgid "Track domain expiry dates and DNS status"
+msgstr ""
+
 #: src/components/domains-table/domains-table.tsx
 msgid "Track domain expiry dates and watch domains for purchase"
+msgstr ""
+
+#: src/components/routes/home.tsx
+msgid "Track system resources, containers, and health"
+msgstr ""
+
+#: src/components/routes/monitoring.tsx
+msgid "Track uptime, response times, and service health"
 msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
@@ -2347,7 +2416,6 @@ msgstr "Использование"
 msgid "Value"
 msgstr "Значение"
 
-#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "View"
@@ -2400,7 +2468,8 @@ msgstr "Пороги предупреждения"
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Push уведомления"
 
-#: src/components/monitors-table/monitors-table.tsx
+#: src/components/routes/home.tsx
+#: src/components/routes/monitoring.tsx
 msgid "Website & Service Monitoring"
 msgstr ""
 

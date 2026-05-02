@@ -1,13 +1,10 @@
 import { Trans, useLingui } from "@lingui/react/macro"
-import { useStore } from "@nanostores/react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
 	ArrowDownIcon,
-	ArrowUpDownIcon,
 	ArrowUpIcon,
 	CheckCircleIcon,
 	Edit3Icon,
-	EyeIcon,
 	FilterIcon,
 	GlobeIcon,
 	LayoutGridIcon,
@@ -17,6 +14,7 @@ import {
 	PlusIcon,
 	RefreshCwIcon,
 	Settings2Icon,
+	TagIcon,
 	Trash2Icon,
 	XCircleIcon,
 } from "lucide-react"
@@ -31,7 +29,6 @@ import {
 } from "@/components/ui/card"
 import {
 	DropdownMenu,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
@@ -65,6 +62,7 @@ import {
 	resumeMonitor,
 	type Monitor,
 	type MonitorStatus,
+	type MonitorType,
 	formatUptime,
 	formatPing,
 } from "@/lib/monitors"
@@ -200,6 +198,20 @@ function MonitorCard({
 					<UptimeBar stats={monitor.uptime_stats} />
 				</div>
 			</div>
+
+			{monitor.tags && monitor.tags.length > 0 && (
+				<div className="flex flex-wrap gap-1">
+					{monitor.tags.map((tag) => (
+						<span
+							key={tag}
+							className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium"
+						>
+							<TagIcon className="h-3 w-3" />
+							{tag}
+						</span>
+					))}
+				</div>
+			)}
 
 			<div className="flex items-center gap-2 pt-2 border-t">
 				<TooltipProvider>
@@ -356,6 +368,19 @@ function MonitorRow({
 			<TableCell>
 				<UptimeBar stats={monitor.uptime_stats} />
 			</TableCell>
+			<TableCell>
+				<div className="flex flex-wrap gap-1">
+					{monitor.tags?.map((tag) => (
+						<span
+							key={tag}
+							className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium"
+						>
+							<TagIcon className="h-3 w-3" />
+							{tag}
+						</span>
+					))}
+				</div>
+			</TableCell>
 			<TableCell className="text-right">
 				<div className="flex items-center justify-end gap-1">
 					<TooltipProvider>
@@ -433,12 +458,15 @@ function MonitorRow({
 
 type ViewMode = "table" | "grid"
 type StatusFilter = "all" | MonitorStatus
+type TypeFilter = "all" | MonitorType
 
 // Main component
 export default memo(function MonitorsTable() {
-	const { t, i18n } = useLingui()
+	const { t } = useLingui()
 	const [filter, setFilter] = useState("")
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+	const [tagFilter, setTagFilter] = useState<string>("all")
+	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
 	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 	const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null)
 	
@@ -453,23 +481,46 @@ export default memo(function MonitorsTable() {
 		refetchInterval: 30000,
 	})
 
+	// Extract all unique types
+	const allTypes = useMemo(() => {
+		const typeSet = new Set<MonitorType>()
+		monitors.forEach((m) => typeSet.add(m.type))
+		return Array.from(typeSet).sort()
+	}, [monitors])
+
 	// Filter by status first
 	const statusFilteredMonitors = useMemo(() => {
 		if (statusFilter === "all") return monitors
 		return monitors.filter((m) => m.status === statusFilter)
 	}, [monitors, statusFilter])
 
-	// Then filter by search text
+	// Then filter by search text and type
 	const filteredMonitors = useMemo(() => {
-		if (!filter) return statusFilteredMonitors
-		const f = filter.toLowerCase()
-		return statusFilteredMonitors.filter(
-			(m) =>
-				m.name.toLowerCase().includes(f) ||
-				(m.url || "").toLowerCase().includes(f) ||
-				(m.hostname || "").toLowerCase().includes(f)
-		)
-	}, [statusFilteredMonitors, filter])
+		let result = statusFilteredMonitors
+		if (filter) {
+			const f = filter.toLowerCase()
+			result = result.filter(
+				(m) =>
+					m.name.toLowerCase().includes(f) ||
+					(m.url || "").toLowerCase().includes(f) ||
+					(m.hostname || "").toLowerCase().includes(f)
+			)
+		}
+		if (tagFilter !== "all") {
+			result = result.filter((m) => m.tags?.includes(tagFilter))
+		}
+		if (typeFilter !== "all") {
+			result = result.filter((m) => m.type === typeFilter)
+		}
+		return result
+	}, [statusFilteredMonitors, filter, tagFilter, typeFilter])
+
+	// Extract all unique tags
+	const allTags = useMemo(() => {
+		const tagSet = new Set<string>()
+		monitors.forEach((m) => m.tags?.forEach((tag) => tagSet.add(tag)))
+		return Array.from(tagSet).sort()
+	}, [monitors])
 
 	const stats = useMemo(() => {
 		const total = monitors.length
@@ -490,7 +541,7 @@ export default memo(function MonitorsTable() {
 						<div className="flex-1">
 							<CardTitle className="text-xl mb-2 flex items-center gap-2">
 								<GlobeIcon className="h-5 w-5 text-primary" />
-								<Trans>Website & Service Monitoring</Trans>
+								<Trans>Status</Trans>
 							</CardTitle>
 							<CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
 								<Trans>Monitor websites, APIs, and services</Trans>
@@ -519,6 +570,29 @@ export default memo(function MonitorsTable() {
 						</Button>
 					</div>
 
+					{/* Quick status filters */}
+					<div className="flex flex-wrap gap-1.5">
+						{[
+							{ key: "all", label: `All ${stats.total}`, color: "bg-primary" },
+							{ key: "up", label: `Up ${stats.up}`, color: "bg-green-500" },
+							{ key: "down", label: `Down ${stats.down}`, color: "bg-red-500" },
+							{ key: "paused", label: `Paused ${stats.paused}`, color: "bg-gray-400" },
+						].map((s) => (
+							<Button
+								key={s.key}
+								variant={statusFilter === s.key ? "default" : "outline"}
+								size="sm"
+								className="h-7 text-xs gap-1.5"
+								onClick={() => setStatusFilter(s.key as StatusFilter)}
+								disabled={s.key !== "all" && parseInt(s.label.split(" ")[1]) === 0}
+							>
+								<span className={`h-2 w-2 rounded-full ${s.color}`} />
+								{s.label.split(" ")[0]}
+								<span className="text-[10px] opacity-70">{s.label.split(" ")[1]}</span>
+							</Button>
+						))}
+					</div>
+
 					{/* Filter row */}
 					<div className="flex flex-col sm:flex-row gap-2">
 						<div className="relative flex-1">
@@ -529,11 +603,55 @@ export default memo(function MonitorsTable() {
 								className="w-full"
 							/>
 						</div>
+						{allTypes.length > 0 && (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button variant="outline" size="sm">
+										<GlobeIcon className="me-1.5 size-4 opacity-80" />
+										{typeFilter === "all" ? t`Type` : getMonitorTypeLabel(typeFilter)}
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end">
+									<DropdownMenuRadioGroup value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+										<DropdownMenuRadioItem value="all">
+											<Trans>All Types</Trans>
+										</DropdownMenuRadioItem>
+										{allTypes.map((type) => (
+											<DropdownMenuRadioItem key={type} value={type}>
+												{getMonitorTypeLabel(type)}
+											</DropdownMenuRadioItem>
+										))}
+									</DropdownMenuRadioGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						)}
+						{allTags.length > 0 && (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button variant="outline" size="sm">
+										<TagIcon className="me-1.5 size-4 opacity-80" />
+										{tagFilter === "all" ? t`Tags` : tagFilter}
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end">
+									<DropdownMenuRadioGroup value={tagFilter} onValueChange={setTagFilter}>
+										<DropdownMenuRadioItem value="all">
+											<Trans>All Tags</Trans>
+										</DropdownMenuRadioItem>
+										{allTags.map((tag) => (
+											<DropdownMenuRadioItem key={tag} value={tag}>
+												{tag}
+											</DropdownMenuRadioItem>
+										))}
+									</DropdownMenuRadioGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						)}
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button variant="outline">
+								<Button variant="outline" size="sm">
 									<Settings2Icon className="me-1.5 size-4 opacity-80" />
-									<Trans>View</Trans>
+									<Trans>Options</Trans>
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end" className="min-w-48">
@@ -595,7 +713,7 @@ export default memo(function MonitorsTable() {
 					</div>
 				) : filteredMonitors.length === 0 ? (
 					<div className="p-8 text-center text-muted-foreground">
-						{filter || statusFilter !== "all" ? (
+						{filter || statusFilter !== "all" || tagFilter !== "all" || typeFilter !== "all" ? (
 							<Trans>No monitors match your filters.</Trans>
 						) : (
 							<div>
@@ -627,6 +745,9 @@ export default memo(function MonitorsTable() {
 								</TableHead>
 								<TableHead>
 									<Trans>Uptime (24h)</Trans>
+								</TableHead>
+								<TableHead>
+									<Trans>Tags</Trans>
 								</TableHead>
 								<TableHead className="text-right">
 									<Trans>Actions</Trans>

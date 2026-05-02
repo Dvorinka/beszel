@@ -180,6 +180,22 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 		domainData, err := lookupSvc.LookupDomain(ctx, domainName)
 		if err == nil && domainData != nil {
 			h.applyLookupData(record, domainData)
+			// Calculate status based on lookup results
+			status := domain.DomainStatusUnknown
+			if domainData.ExpiryDate != nil {
+				daysUntil := int(time.Until(*domainData.ExpiryDate).Hours() / 24)
+				if daysUntil < 0 {
+					status = domain.DomainStatusExpired
+				} else if daysUntil <= req.AlertDaysBefore {
+					status = domain.DomainStatusExpiring
+				} else {
+					status = domain.DomainStatusActive
+				}
+			} else if len(domainData.IPv4Addresses) > 0 || len(domainData.IPv6Addresses) > 0 || len(domainData.NameServers) > 0 {
+				// DNS resolves means the domain is active and functioning
+				status = domain.DomainStatusActive
+			}
+			record.Set("status", status)
 		}
 	}
 

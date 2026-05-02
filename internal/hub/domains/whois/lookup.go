@@ -672,6 +672,26 @@ func (s *LookupService) lookupDNS(ctx context.Context, domainName string, d *dom
 	txtRecords, _ := net.LookupTXT(domainName)
 	d.TXTRecords = txtRecords
 
+	// CNAME record
+	cname, err := net.LookupCNAME(domainName)
+	if err == nil && cname != domainName && cname != "" {
+		d.CNAMERecord = cname
+	}
+
+	// SRV records (common services)
+	srvServices := []string{"sip", "xmpp-server", "ldap", "autodiscover", "imap", "smtp", "caldavs", "carddavs"}
+	srvProtos := []string{"tcp", "udp", "tls"}
+	for _, service := range srvServices {
+		for _, proto := range srvProtos {
+			_, addrs, err := net.LookupSRV(service, proto, domainName)
+			if err == nil {
+				for _, addr := range addrs {
+					d.SRVRecords = append(d.SRVRecords, fmt.Sprintf("_%s._%s %s:%d (priority: %d, weight: %d)", service, proto, addr.Target, addr.Port, addr.Priority, addr.Weight))
+				}
+			}
+		}
+	}
+
 	// IPv4
 	ipv4Addrs, _ := net.LookupHost(domainName)
 	for _, ip := range ipv4Addrs {

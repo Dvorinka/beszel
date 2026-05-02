@@ -9,6 +9,7 @@ name: beszel
 
 services:
   beszel-hub:
+    image: ghcr.io/dvorinka/beszel:latest
     build:
       context: .
       target: hub

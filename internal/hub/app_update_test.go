@@ -46,3 +46,72 @@ func TestDigestValue(t *testing.T) {
 		})
 	}
 }
+
+func TestCleanEndpointsConfig(t *testing.T) {
+	input := map[string]map[string]any{
+		"beszel": {
+			"NetworkID":           "abc123",
+			"EndpointID":          "ep456",
+			"Gateway":             "172.20.0.1",
+			"IPAddress":           "172.20.0.5",
+			"IPPrefixLen":         16,
+			"IPv6Gateway":         "",
+			"GlobalIPv6Address":   "",
+			"GlobalIPv6PrefixLen": 0,
+			"MacAddress":          "02:42:ac:14:00:05",
+			"Aliases":             []string{"beszel", "beszel-hub"},
+			"Links":               nil,
+			"IPAMConfig":          nil,
+		},
+		"bridge": {
+			"NetworkID":  "bridge-net",
+			"IPAddress":  "172.17.0.2",
+			"Aliases":    []string{},
+			"DriverOpts": map[string]string{},
+		},
+	}
+
+	got := cleanEndpointsConfig(input)
+
+	if got == nil {
+		t.Fatal("cleanEndpointsConfig returned nil for non-nil input")
+	}
+
+	for netName, cfgRaw := range got {
+		cfg, ok := cfgRaw.(map[string]any)
+		if !ok {
+			t.Fatalf("expected network %q config to be map[string]any, got %T", netName, cfgRaw)
+		}
+		for k := range cfg {
+			switch k {
+			case "NetworkID", "EndpointID", "Gateway", "IPAddress", "IPPrefixLen",
+				"IPv6Gateway", "GlobalIPv6Address", "GlobalIPv6PrefixLen", "MacAddress":
+				t.Fatalf("runtime field %q was NOT stripped from network %q", k, netName)
+			}
+		}
+	}
+
+	beszelCfg, ok := got["beszel"].(map[string]any)
+	if !ok {
+		t.Fatal("expected beszel network config to be map[string]any")
+	}
+	aliases, ok := beszelCfg["Aliases"].([]string)
+	if !ok || len(aliases) != 2 || aliases[0] != "beszel" {
+		t.Fatalf("expected Aliases to be preserved, got %v", beszelCfg["Aliases"])
+	}
+
+	bridgeCfg, ok := got["bridge"].(map[string]any)
+	if !ok {
+		t.Fatal("expected bridge network config to be map[string]any")
+	}
+	if _, ok := bridgeCfg["DriverOpts"]; !ok {
+		t.Fatal("expected DriverOpts to be preserved in bridge network")
+	}
+}
+
+func TestCleanEndpointsConfigNil(t *testing.T) {
+	got := cleanEndpointsConfig(nil)
+	if got != nil {
+		t.Fatalf("expected nil, got %v", got)
+	}
+}

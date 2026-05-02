@@ -521,7 +521,7 @@ func (d *dockerAPI) replaceContainer(targetID, image string) error {
 	delete(hostConfig, "AutoRemove")
 	createBody := cloneMap(config)
 	createBody["HostConfig"] = hostConfig
-	createBody["NetworkingConfig"] = map[string]any{"EndpointsConfig": current.NetworkSettings.Networks}
+	createBody["NetworkingConfig"] = map[string]any{"EndpointsConfig": cleanEndpointsConfig(current.NetworkSettings.Networks)}
 
 	var created dockerCreateResponse
 	if err := d.do(http.MethodPost, "/containers/create?name="+url.QueryEscape(newName), createBody, &created); err != nil {
@@ -562,6 +562,29 @@ func cloneMap(in map[string]any) map[string]any {
 	out := make(map[string]any, len(in))
 	for key, value := range in {
 		out[key] = value
+	}
+	return out
+}
+
+// cleanEndpointsConfig strips runtime-populated fields from Docker network settings
+// so they can be safely reused in a container create request.
+func cleanEndpointsConfig(networks map[string]map[string]any) map[string]any {
+	if networks == nil {
+		return nil
+	}
+	out := make(map[string]any, len(networks))
+	for netName, cfg := range networks {
+		cleaned := make(map[string]any, len(cfg))
+		for k, v := range cfg {
+			switch k {
+			case "NetworkID", "EndpointID", "Gateway", "IPAddress", "IPPrefixLen",
+				"IPv6Gateway", "GlobalIPv6Address", "GlobalIPv6PrefixLen", "MacAddress":
+				continue
+			default:
+				cleaned[k] = v
+			}
+		}
+		out[netName] = cleaned
 	}
 	return out
 }

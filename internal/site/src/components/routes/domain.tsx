@@ -44,7 +44,6 @@ import {
 	formatDate,
 	formatDays,
 } from "@/lib/domains"
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from "recharts"
 import { Link, navigate } from "@/components/router"
 import { DomainDialog } from "@/components/domains-table/domain-dialog"
 
@@ -259,77 +258,146 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 				/>
 			</div>
 
-			{/* Expiry Comparison Chart */}
-			<Card>
-				<CardHeader>
-					<CardTitle>Expiry Overview</CardTitle>
-					<CardDescription>Days remaining until domain and SSL certificate expiration</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div className="h-[200px]">
-						<ResponsiveContainer width="100%" height="100%">
-							<BarChart
-								data={[
-									...(typeof domain.days_until_expiry === "number" && domain.days_until_expiry >= 0
-										? [{ name: "Domain Expiry", days: domain.days_until_expiry }]
-										: []),
-									...(typeof domain.ssl_days_until === "number" && domain.ssl_days_until >= 0
-										? [{ name: "SSL Expiry", days: domain.ssl_days_until }]
-										: []),
-								]}
-								layout="vertical"
-							>
-								<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-								<XAxis type="number" tick={{ fontSize: 12 }} />
-								<YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={100} />
-								<Tooltip
-									formatter={(value: number) => [`${value} days`, "Remaining"]}
-									contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-								/>
-								<Bar dataKey="days" radius={[0, 4, 4, 0]}>
-									{[{ days: domain.days_until_expiry ?? 0 }, { days: domain.ssl_days_until ?? 0 }].map(
-										(entry, index) => (
-											<Cell
-												key={`cell-${index}`}
-												fill={entry.days <= 14 ? "#ef4444" : entry.days <= 30 ? "#f59e0b" : "#22c55e"}
-											/>
-										)
-									)}
-								</Bar>
-							</BarChart>
-						</ResponsiveContainer>
-					</div>
-				</CardContent>
-			</Card>
+			{/* Expiry Overview - Clean visual cards */}
+			<div className="grid sm:grid-cols-2 gap-4">
+				{/* Domain Expiry Card */}
+				<Card className={`${
+					domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 7
+						? "border-red-500/40"
+						: domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
+							? "border-yellow-500/40"
+							: ""
+					}`}>
+					<CardContent className="p-5">
+						<div className="flex items-center justify-between mb-4">
+							<div className="flex items-center gap-3">
+								<div className={`p-2.5 rounded-xl ${
+									domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 7
+										? "bg-red-500/10"
+										: domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
+											? "bg-yellow-500/10"
+											: "bg-green-500/10"
+									}`}>
+									<Globe className={`h-5 w-5 ${
+										domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 7
+											? "text-red-500"
+											: domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
+												? "text-yellow-500"
+												: "text-green-500"
+										}`} />
+								</div>
+								<div>
+									<p className="text-sm text-muted-foreground">Domain Expires</p>
+									<p className="font-semibold">{formatDate(domain.expiry_date) || "N/A"}</p>
+								</div>
+							</div>
+							<div className={`text-2xl font-bold ${
+								domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 7
+									? "text-red-500"
+									: domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
+										? "text-yellow-500"
+										: "text-green-500"
+								}`}>
+								{typeof domain.days_until_expiry === "number" && domain.days_until_expiry >= 0
+									? formatDays(domain.days_until_expiry)
+									: domain.days_until_expiry === -1
+										? "No expiry data"
+										: "N/A"
+								}
+							</div>
+						</div>
+						{typeof domain.days_until_expiry === "number" && domain.days_until_expiry >= 0 && (() => {
+							const d = domain.days_until_expiry
+							return (
+								<div className="flex gap-1 mt-2">
+									{Array.from({ length: Math.min(12, Math.ceil(d / 30)) }).map((_, i) => (
+										<div
+											key={i}
+											className={`flex-1 h-1.5 rounded-full ${
+												d <= 7 ? "bg-red-500"
+													: d <= 30 ? "bg-yellow-500"
+														: "bg-green-500"
+												}`}
+										/>
+										))}
+										{d > 360 && (
+											<span className="text-[10px] text-muted-foreground ml-1">+</span>
+										)}
+								</div>
+							)
+							})()}
+						</CardContent>
+					</Card>
 
-			<div className="grid gap-4">
-				{/* Expiry Timeline Chart */}
-				<Card>
-					<CardHeader>
-						<CardTitle>Change Timeline</CardTitle>
-						<CardDescription>Recent detected domain, DNS, SSL, and registrar changes</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-3">
-							{history?.slice(0, 8).map((event) => (
-								<div key={event.id} className="flex items-start gap-3 rounded-md border p-3">
-									<Badge variant="outline" className="mt-0.5">
-										{event.change_type}
-									</Badge>
-									<div className="min-w-0 flex-1">
-										<p className="text-sm font-medium">{event.field_name}</p>
-										<p className="text-xs text-muted-foreground break-words">
-											{event.old_value || "Unknown"} {"->"} {event.new_value || "Unknown"}
-										</p>
-										<p className="text-xs text-muted-foreground mt-1">{formatDate(event.created_at)}</p>
+					{/* SSL Expiry Card */}
+					<Card className={`${
+						domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 7
+							? "border-red-500/40"
+							: domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 30
+								? "border-yellow-500/40"
+								: ""
+						}`}>
+						<CardContent className="p-5">
+							<div className="flex items-center justify-between mb-4">
+								<div className="flex items-center gap-3">
+									<div className={`p-2.5 rounded-xl ${
+										domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 7
+											? "bg-red-500/10"
+											: domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 30
+												? "bg-yellow-500/10"
+												: "bg-green-500/10"
+										}`}>
+										<Shield className={`h-5 w-5 ${
+											domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 7
+												? "text-red-500"
+												: domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 30
+													? "text-yellow-500"
+													: "text-green-500"
+											}`} />
+									</div>
+									<div>
+										<p className="text-sm text-muted-foreground">SSL Expires</p>
+										<p className="font-semibold">{formatDate(domain.ssl_valid_to) || "No SSL"}</p>
 									</div>
 								</div>
-							))}
-							{!history?.length && <p className="text-sm text-muted-foreground">No changes recorded yet.</p>}
-						</div>
-					</CardContent>
-				</Card>
+								<div className={`text-2xl font-bold ${
+									domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 7
+										? "text-red-500"
+											: domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 30
+												? "text-yellow-500"
+												: "text-green-500"
+										}`}>
+									{typeof domain.ssl_days_until === "number" && domain.ssl_days_until >= 0
+										? formatDays(domain.ssl_days_until)
+										: "N/A"
+									}
+								</div>
+							</div>
+							{typeof domain.ssl_days_until === "number" && domain.ssl_days_until >= 0 && (() => {
+								const sslDaysUntil = domain.ssl_days_until;
+								return (
+									<div className="flex gap-1 mt-2">
+										{Array.from({ length: Math.min(12, Math.ceil(sslDaysUntil / 30)) }).map((_, i) => (
+											<div
+												key={i}
+												className={`flex-1 h-1.5 rounded-full ${
+													sslDaysUntil <= 7 ? "bg-red-500"
+														: sslDaysUntil <= 30 ? "bg-yellow-500"
+															: "bg-green-500"
+													}`}
+												/>
+											))}
+											{sslDaysUntil > 360 && (
+												<span className="text-[10px] text-muted-foreground ml-1">+</span>
+											)}
+									</div>
+								)
+								})()}
+							</CardContent>
+						</Card>
+					</div>
 
+			<div className="grid gap-4">
 				{/* Additional Info */}
 				<div className="grid sm:grid-cols-2 gap-4">
 					<Card>
@@ -355,29 +423,37 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 						</CardContent>
 					</Card>
 
-					<Card>
-						<CardHeader>
-							<CardTitle>Valuation</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-2">
-							<div className="flex justify-between">
-								<span className="text-muted-foreground">Purchase Price</span>
-								<span className="font-medium">${domain.purchase_price || 0}</span>
-							</div>
-							<div className="flex justify-between">
-								<span className="text-muted-foreground">Current Value</span>
-								<span className="font-medium">${domain.current_value || 0}</span>
-							</div>
-							<div className="flex justify-between">
-								<span className="text-muted-foreground">Renewal Cost</span>
-								<span className="font-medium">${domain.renewal_cost || 0}</span>
-							</div>
-							<div className="flex justify-between">
-								<span className="text-muted-foreground">Auto-renew</span>
-								<Badge variant={domain.auto_renew ? "default" : "secondary"}>{domain.auto_renew ? "Yes" : "No"}</Badge>
-							</div>
-						</CardContent>
-					</Card>
+					{((domain.purchase_price ?? 0) > 0 || (domain.current_value ?? 0) > 0 || (domain.renewal_cost ?? 0) > 0) && (
+						<Card>
+							<CardHeader>
+								<CardTitle>Valuation</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-2">
+								{(domain.purchase_price ?? 0) > 0 && (
+									<div className="flex justify-between">
+										<span className="text-muted-foreground">Purchase Price</span>
+										<span className="font-medium">${domain.purchase_price}</span>
+									</div>
+								)}
+								{(domain.current_value ?? 0) > 0 && (
+									<div className="flex justify-between">
+										<span className="text-muted-foreground">Current Value</span>
+										<span className="font-medium">${domain.current_value}</span>
+									</div>
+								)}
+								{(domain.renewal_cost ?? 0) > 0 && (
+									<div className="flex justify-between">
+										<span className="text-muted-foreground">Renewal Cost</span>
+										<span className="font-medium">${domain.renewal_cost}</span>
+									</div>
+								)}
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Auto-renew</span>
+									<Badge variant={domain.auto_renew ? "default" : "secondary"}>{domain.auto_renew ? "Yes" : "No"}</Badge>
+								</div>
+							</CardContent>
+						</Card>
+					)}
 				</div>
 
 				{/* Notes */}
@@ -397,9 +473,51 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 				<Card>
 					<CardHeader>
 						<CardTitle>DNS Records</CardTitle>
-						<CardDescription>Name servers, mail exchangers, and text records</CardDescription>
+						<CardDescription>A, AAAA, name servers, mail exchangers, and text records</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-6">
+						{/* A Records (IPv4) */}
+						{(domain.ipv4_addresses?.length ?? 0) > 0 && (
+							<div>
+								<h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+									<Server className="h-4 w-4" />
+									A Records (IPv4)
+									<Badge variant="secondary" className="ml-2">
+										{domain.ipv4_addresses?.length || 0}
+									</Badge>
+								</h4>
+								<div className="space-y-1">
+									{domain.ipv4_addresses?.map((ip: string, i: number) => (
+										<div key={i} className="flex items-center gap-2">
+											<Badge variant="outline">A</Badge>
+											<code className="text-sm font-mono">{ip}</code>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* AAAA Records (IPv6) */}
+						{(domain.ipv6_addresses?.length ?? 0) > 0 && (
+							<div>
+								<h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+									<Server className="h-4 w-4" />
+									AAAA Records (IPv6)
+									<Badge variant="secondary" className="ml-2">
+										{domain.ipv6_addresses?.length || 0}
+									</Badge>
+								</h4>
+								<div className="space-y-1">
+									{domain.ipv6_addresses?.map((ip: string, i: number) => (
+										<div key={i} className="flex items-center gap-2">
+											<Badge variant="outline">AAAA</Badge>
+											<code className="text-sm font-mono break-all">{ip}</code>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
 						{/* Nameservers */}
 						<div>
 							<h4 className="text-sm font-medium mb-2 flex items-center gap-2">
@@ -441,6 +559,20 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 							</div>
 						)}
 
+						{/* CNAME Record */}
+						{domain.cname_record && (
+							<div>
+								<h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+									<Globe className="h-4 w-4" />
+									CNAME Record
+								</h4>
+								<div className="flex items-center gap-2">
+									<Badge variant="outline">CNAME</Badge>
+									<code className="text-sm">{domain.cname_record}</code>
+								</div>
+							</div>
+						)}
+
 						{/* TXT Records */}
 						{domain.txt_records && domain.txt_records.length > 0 && (
 							<div>
@@ -456,6 +588,27 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 										<div key={i} className="flex items-start gap-2">
 											<Badge variant="outline">TXT</Badge>
 											<code className="text-sm break-all">{txt}</code>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* SRV Records */}
+						{domain.srv_records && domain.srv_records.length > 0 && (
+							<div>
+								<h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+									<Server className="h-4 w-4" />
+									SRV Records
+									<Badge variant="secondary" className="ml-2">
+										{domain.srv_records.length}
+									</Badge>
+								</h4>
+								<div className="space-y-1">
+									{domain.srv_records?.map((srv: string, i: number) => (
+										<div key={i} className="flex items-start gap-2">
+											<Badge variant="outline">SRV</Badge>
+											<code className="text-sm break-all">{srv}</code>
 										</div>
 									))}
 								</div>
@@ -667,20 +820,31 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 							</div>
 						)}
 
-						{/* Domain Status */}
-						{domain.status && domain.status !== "unknown" && (
+						{/* WHOIS Domain Status (EPP status codes) */}
+						{domain.whois_status && (
 							<div className="space-y-2 pt-4 border-t">
 								<h4 className="text-sm font-medium flex items-center gap-2">
 									<Shield className="h-4 w-4" />
-									Domain Status
+									EPP Status Codes
 								</h4>
 								<div className="flex flex-wrap gap-2">
-									{domain.status.split(", ").map((status: string, i: number) => (
+									{domain.whois_status.split(", ").map((status: string, i: number) => (
 										<Badge key={i} variant="secondary">
 											{status}
 										</Badge>
 									))}
 								</div>
+							</div>
+						)}
+
+						{/* WHOIS Server */}
+						{domain.whois_server && (
+							<div className="space-y-2 pt-4 border-t">
+								<h4 className="text-sm font-medium flex items-center gap-2">
+									<Server className="h-4 w-4" />
+									WHOIS Server
+								</h4>
+								<code className="text-sm">{domain.whois_server}</code>
 							</div>
 						)}
 					</CardContent>
@@ -690,26 +854,62 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 			<Card>
 				<CardHeader>
 					<CardTitle>Change History</CardTitle>
-					<CardDescription>Historical changes to domain information</CardDescription>
+					<CardDescription>Timeline of detected domain, DNS, SSL, and registrar changes</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<div className="space-y-4">
-						{history?.map((item: DomainHistory) => (
-							<div key={item.id} className="flex items-start gap-4 pb-4 border-b last:border-0">
-								<div className="p-2 bg-muted rounded-lg">
-									<Clock className="h-4 w-4 text-muted-foreground" />
-								</div>
-								<div className="flex-1">
-									<p className="font-medium">{item.change_type}</p>
-									<p className="text-sm text-muted-foreground">{item.change_description}</p>
-									<p className="text-xs text-muted-foreground mt-1">
-										{new Date(item.created_at || item.created).toLocaleString()}
-									</p>
-								</div>
-							</div>
-						))}
-						{!history?.length && <p className="text-muted-foreground text-center py-8">No history available</p>}
-					</div>
+					{history?.length ? (
+						<div className="relative space-y-0">
+							{/* Timeline line */}
+							<div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
+							{history.map((item: DomainHistory) => {
+								const typeConfig: Record<string, { color: string; icon: string }> = {
+									expiry: { color: "bg-yellow-500", icon: "📅" },
+									ssl: { color: "bg-purple-500", icon: "🔒" },
+									dns: { color: "bg-blue-500", icon: "🌐" },
+									registrar: { color: "bg-orange-500", icon: "🏢" },
+									ip: { color: "bg-cyan-500", icon: "💻" },
+									host: { color: "bg-teal-500", icon: "📍" },
+									status: { color: "bg-green-500", icon: "✅" },
+								}
+								const config = typeConfig[item.change_type] || { color: "bg-gray-500", icon: "📋" }
+								return (
+									<div key={item.id} className="relative flex items-start gap-3 pb-4 last:pb-0">
+										{/* Timeline dot */}
+										<div className={`relative z-10 mt-1 h-[30px] w-[30px] shrink-0 rounded-full ${config.color}/10 flex items-center justify-center border-2 border-background`}>
+											<div className={`h-2.5 w-2.5 rounded-full ${config.color}`} />
+										</div>
+										{/* Content */}
+										<div className="min-w-0 flex-1 rounded-lg border p-3">
+											<div className="flex items-center gap-2 mb-1">
+												<Badge variant="outline" className="text-[10px] px-1.5 py-0">
+													{item.change_type}
+												</Badge>
+												<span className="text-xs text-muted-foreground">
+													{formatDate(item.created_at)}
+												</span>
+											</div>
+											<p className="text-sm font-medium">{item.field_name}</p>
+											<div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+												<code className="bg-muted px-1.5 py-0.5 rounded text-[11px] break-all max-w-[200px] truncate">
+													{item.old_value || "—"}
+												</code>
+												<span className="shrink-0">→</span>
+												<code className="bg-muted px-1.5 py-0.5 rounded text-[11px] break-all max-w-[200px] truncate">
+													{item.new_value || "—"}
+												</code>
+											</div>
+										</div>
+									</div>
+								)
+							})}
+						</div>
+					) : (
+						<div className="text-center py-8">
+							<FileText className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+							<p className="text-sm text-muted-foreground">No changes recorded yet.</p>
+							<p className="text-xs text-muted-foreground mt-1">Changes will appear here when domain data is updated.</p>
+						</div>
+					)}
 				</CardContent>
 			</Card>
 			<DomainDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} domain={domain} isEdit />

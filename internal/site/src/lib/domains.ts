@@ -16,6 +16,8 @@ export interface Domain {
 	name_servers?: string[]
 	mx_records?: string[]
 	txt_records?: string[]
+	cname_record?: string
+	srv_records?: string[]
 	ipv4_addresses?: string[]
 	ipv6_addresses?: string[]
 	dnssec?: string
