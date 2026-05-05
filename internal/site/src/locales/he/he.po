@@ -230,6 +230,15 @@ msgstr "כל הקונטיינרים"
 msgid "All Systems"
 msgstr "כל המערכות"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
+msgid "All Tags"
+msgstr ""
+
+#: src/components/monitors-table/monitors-table.tsx
+msgid "All Types"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "App update"
 msgstr ""
@@ -465,8 +474,8 @@ msgstr ""
 
 #: src/components/routes/monitor.tsx
 #: src/components/routes/monitor.tsx
-msgid "Check Now"
-msgstr ""
+#~ msgid "Check Now"
+#~ msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -784,6 +793,10 @@ msgctxt "Layout display options"
 msgid "Display"
 msgstr "תצוגה"
 
+#: src/components/domains-table/domains-table.tsx
+msgid "Display Columns"
+msgstr ""
+
 #: src/components/routes/domain.tsx
 #~ msgid "DNS Records"
 #~ msgstr ""
@@ -814,7 +827,6 @@ msgid "Domain and SSL expiry calendar"
 msgstr ""
 
 #: src/components/domains-table/domains-table.tsx
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Domain Monitoring"
 msgstr ""
@@ -1407,7 +1419,6 @@ msgid "Monitor updated successfully"
 msgstr ""
 
 #: src/components/monitors-table/monitors-table.tsx
-#: src/components/routes/home.tsx
 msgid "Monitor websites, APIs, and services"
 msgstr ""
 
@@ -1448,6 +1459,10 @@ msgstr ""
 msgid "Net"
 msgstr "רשת"
 
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Network (Grouped)"
+msgstr ""
+
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of docker containers"
 msgstr "תעבורת רשת של קונטיינרים של Docker"
@@ -1471,8 +1486,8 @@ msgid "No"
 msgstr "לא"
 
 #: src/components/routes/monitor.tsx
-msgid "No data available for selected time range"
-msgstr ""
+#~ msgid "No data available for selected time range"
+#~ msgstr ""
 
 #: src/components/routes/incidents.tsx
 msgid "No incidents found."
@@ -1553,6 +1568,11 @@ msgstr "פתח תפריט"
 msgid "Optional description for this monitor"
 msgstr ""
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Options"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "או המשך עם"
@@ -1626,6 +1646,8 @@ msgid "Paused"
 msgstr "מושהה"
 
 #. placeholder {0}: stats.paused
+#. placeholder {0}: statusCounts.paused
+#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 msgid "Paused ({0})"
 msgstr ""
@@ -2004,7 +2026,6 @@ msgstr "מצב"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/domains-table/domains-table.tsx
-#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
@@ -2019,9 +2040,12 @@ msgstr "סטטוס"
 msgid "Status and response time over the selected period"
 msgstr ""
 
+#: src/components/routes/status-pages.tsx
+msgid "Status Page Manager"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/routes/home.tsx
-#: src/components/routes/status-pages.tsx
 msgid "Status Pages"
 msgstr ""
 
@@ -2065,8 +2089,8 @@ msgid "System load averages over time"
 msgstr "ממוצעי עומס מערכת לאורך זמן"
 
 #: src/components/routes/home.tsx
-msgid "System Monitoring"
-msgstr ""
+#~ msgid "System Monitoring"
+#~ msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
@@ -2091,6 +2115,8 @@ msgctxt "Tabs system layout option"
 msgid "Tabs"
 msgstr "לשוניות"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 msgid "Tags"
 msgstr ""
@@ -2213,7 +2239,6 @@ msgstr ""
 msgid "Total: {0}"
 msgstr "סה\"כ: {0}"
 
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Track domain expiry dates and DNS status"
 msgstr ""
@@ -2223,8 +2248,8 @@ msgid "Track domain expiry dates and watch domains for purchase"
 msgstr ""
 
 #: src/components/routes/home.tsx
-msgid "Track system resources, containers, and health"
-msgstr ""
+#~ msgid "Track system resources, containers, and health"
+#~ msgstr ""
 
 #: src/components/routes/monitoring.tsx
 msgid "Track uptime, response times, and service health"
@@ -2282,6 +2307,7 @@ msgstr "מופעל כאשר הסטטוס מתחלף בין למעלה ולמטה
 msgid "Triggers when usage of any disk exceeds a threshold"
 msgstr "מופעל כאשר שימוש בכל דיסק עולה על סף"
 
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2416,7 +2442,6 @@ msgstr "ניצולת"
 msgid "Value"
 msgstr "ערך"
 
-#: src/components/monitors-table/monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "View"
 msgstr "צפה"
@@ -2468,7 +2493,6 @@ msgstr "ספי אזהרה"
 msgid "Webhook / Push notifications"
 msgstr "Webhook / התראות דחיפה"
 
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Website & Service Monitoring"
 msgstr ""

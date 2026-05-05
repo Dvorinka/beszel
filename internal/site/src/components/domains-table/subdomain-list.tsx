@@ -181,7 +181,6 @@ export function SubdomainList({ domainId }: SubdomainListProps) {
 								<p>Run enhanced subdomain discovery</p>
 							</TooltipContent>
 							</Tooltip>
-						</Tooltip>
 					</TooltipProvider>
 				</div>
 			</CardHeader>

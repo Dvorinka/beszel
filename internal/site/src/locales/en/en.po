@@ -225,6 +225,15 @@ msgstr "All Containers"
 msgid "All Systems"
 msgstr "All Systems"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
+msgid "All Tags"
+msgstr "All Tags"
+
+#: src/components/monitors-table/monitors-table.tsx
+msgid "All Types"
+msgstr "All Types"
+
 #: src/components/routes/settings/general.tsx
 msgid "App update"
 msgstr "App update"
@@ -460,8 +469,8 @@ msgstr "Check now"
 
 #: src/components/routes/monitor.tsx
 #: src/components/routes/monitor.tsx
-msgid "Check Now"
-msgstr "Check Now"
+#~ msgid "Check Now"
+#~ msgstr "Check Now"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -779,6 +788,10 @@ msgctxt "Layout display options"
 msgid "Display"
 msgstr "Display"
 
+#: src/components/domains-table/domains-table.tsx
+msgid "Display Columns"
+msgstr "Display Columns"
+
 #: src/components/routes/domain.tsx
 #~ msgid "DNS Records"
 #~ msgstr "DNS Records"
@@ -809,7 +822,6 @@ msgid "Domain and SSL expiry calendar"
 msgstr "Domain and SSL expiry calendar"
 
 #: src/components/domains-table/domains-table.tsx
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Domain Monitoring"
 msgstr "Domain Monitoring"
@@ -1402,7 +1414,6 @@ msgid "Monitor updated successfully"
 msgstr "Monitor updated successfully"
 
 #: src/components/monitors-table/monitors-table.tsx
-#: src/components/routes/home.tsx
 msgid "Monitor websites, APIs, and services"
 msgstr "Monitor websites, APIs, and services"
 
@@ -1443,6 +1454,10 @@ msgstr "Name is required"
 msgid "Net"
 msgstr "Net"
 
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Network (Grouped)"
+msgstr "Network (Grouped)"
+
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of docker containers"
 msgstr "Network traffic of docker containers"
@@ -1466,8 +1481,8 @@ msgid "No"
 msgstr "No"
 
 #: src/components/routes/monitor.tsx
-msgid "No data available for selected time range"
-msgstr "No data available for selected time range"
+#~ msgid "No data available for selected time range"
+#~ msgstr "No data available for selected time range"
 
 #: src/components/routes/incidents.tsx
 msgid "No incidents found."
@@ -1548,6 +1563,11 @@ msgstr "Open menu"
 msgid "Optional description for this monitor"
 msgstr "Optional description for this monitor"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Options"
+msgstr "Options"
+
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "Or continue with"
@@ -1621,6 +1641,8 @@ msgid "Paused"
 msgstr "Paused"
 
 #. placeholder {0}: stats.paused
+#. placeholder {0}: statusCounts.paused
+#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 msgid "Paused ({0})"
 msgstr "Paused ({0})"
@@ -1999,7 +2021,6 @@ msgstr "State"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/domains-table/domains-table.tsx
-#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
@@ -2014,9 +2035,12 @@ msgstr "Status"
 msgid "Status and response time over the selected period"
 msgstr "Status and response time over the selected period"
 
+#: src/components/routes/status-pages.tsx
+msgid "Status Page Manager"
+msgstr "Status Page Manager"
+
 #: src/components/command-palette.tsx
 #: src/components/routes/home.tsx
-#: src/components/routes/status-pages.tsx
 msgid "Status Pages"
 msgstr "Status Pages"
 
@@ -2060,8 +2084,8 @@ msgid "System load averages over time"
 msgstr "System load averages over time"
 
 #: src/components/routes/home.tsx
-msgid "System Monitoring"
-msgstr "System Monitoring"
+#~ msgid "System Monitoring"
+#~ msgstr "System Monitoring"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
@@ -2086,6 +2110,8 @@ msgctxt "Tabs system layout option"
 msgid "Tabs"
 msgstr "Tabs"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 msgid "Tags"
 msgstr "Tags"
@@ -2208,7 +2234,6 @@ msgstr "Total time spent on read/write (can exceed 100%)"
 msgid "Total: {0}"
 msgstr "Total: {0}"
 
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Track domain expiry dates and DNS status"
 msgstr "Track domain expiry dates and DNS status"
@@ -2218,8 +2243,8 @@ msgid "Track domain expiry dates and watch domains for purchase"
 msgstr "Track domain expiry dates and watch domains for purchase"
 
 #: src/components/routes/home.tsx
-msgid "Track system resources, containers, and health"
-msgstr "Track system resources, containers, and health"
+#~ msgid "Track system resources, containers, and health"
+#~ msgstr "Track system resources, containers, and health"
 
 #: src/components/routes/monitoring.tsx
 msgid "Track uptime, response times, and service health"
@@ -2277,6 +2302,7 @@ msgstr "Triggers when status switches between up and down"
 msgid "Triggers when usage of any disk exceeds a threshold"
 msgstr "Triggers when usage of any disk exceeds a threshold"
 
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2411,7 +2437,6 @@ msgstr "Utilization"
 msgid "Value"
 msgstr "Value"
 
-#: src/components/monitors-table/monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "View"
 msgstr "View"
@@ -2463,7 +2488,6 @@ msgstr "Warning thresholds"
 msgid "Webhook / Push notifications"
 msgstr "Webhook / Push notifications"
 
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Website & Service Monitoring"
 msgstr "Website & Service Monitoring"

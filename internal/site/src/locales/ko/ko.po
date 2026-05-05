@@ -230,6 +230,15 @@ msgstr "모든 컨테이너"
 msgid "All Systems"
 msgstr "모든 시스템"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
+msgid "All Tags"
+msgstr ""
+
+#: src/components/monitors-table/monitors-table.tsx
+msgid "All Types"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "App update"
 msgstr ""
@@ -465,8 +474,8 @@ msgstr ""
 
 #: src/components/routes/monitor.tsx
 #: src/components/routes/monitor.tsx
-msgid "Check Now"
-msgstr ""
+#~ msgid "Check Now"
+#~ msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -784,6 +793,10 @@ msgctxt "Layout display options"
 msgid "Display"
 msgstr "표시"
 
+#: src/components/domains-table/domains-table.tsx
+msgid "Display Columns"
+msgstr ""
+
 #: src/components/routes/domain.tsx
 #~ msgid "DNS Records"
 #~ msgstr ""
@@ -814,7 +827,6 @@ msgid "Domain and SSL expiry calendar"
 msgstr ""
 
 #: src/components/domains-table/domains-table.tsx
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Domain Monitoring"
 msgstr ""
@@ -1407,7 +1419,6 @@ msgid "Monitor updated successfully"
 msgstr ""
 
 #: src/components/monitors-table/monitors-table.tsx
-#: src/components/routes/home.tsx
 msgid "Monitor websites, APIs, and services"
 msgstr ""
 
@@ -1448,6 +1459,10 @@ msgstr ""
 msgid "Net"
 msgstr "네트워크"
 
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Network (Grouped)"
+msgstr ""
+
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of docker containers"
 msgstr "Docker 컨테이너의 네트워크 트래픽"
@@ -1471,8 +1486,8 @@ msgid "No"
 msgstr "아니오"
 
 #: src/components/routes/monitor.tsx
-msgid "No data available for selected time range"
-msgstr ""
+#~ msgid "No data available for selected time range"
+#~ msgstr ""
 
 #: src/components/routes/incidents.tsx
 msgid "No incidents found."
@@ -1553,6 +1568,11 @@ msgstr "메뉴 열기"
 msgid "Optional description for this monitor"
 msgstr ""
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Options"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "또는 아래 항목으로 진행하기"
@@ -1626,6 +1646,8 @@ msgid "Paused"
 msgstr "일시 정지됨"
 
 #. placeholder {0}: stats.paused
+#. placeholder {0}: statusCounts.paused
+#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 msgid "Paused ({0})"
 msgstr ""
@@ -2004,7 +2026,6 @@ msgstr "상태"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/domains-table/domains-table.tsx
-#: src/components/domains-table/domains-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
@@ -2019,9 +2040,12 @@ msgstr "상태"
 msgid "Status and response time over the selected period"
 msgstr ""
 
+#: src/components/routes/status-pages.tsx
+msgid "Status Page Manager"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/routes/home.tsx
-#: src/components/routes/status-pages.tsx
 msgid "Status Pages"
 msgstr ""
 
@@ -2065,8 +2089,8 @@ msgid "System load averages over time"
 msgstr "시간에 따른 시스템 부하 평균"
 
 #: src/components/routes/home.tsx
-msgid "System Monitoring"
-msgstr ""
+#~ msgid "System Monitoring"
+#~ msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
@@ -2091,6 +2115,8 @@ msgctxt "Tabs system layout option"
 msgid "Tabs"
 msgstr "탭"
 
+#: src/components/domains-table/domains-table.tsx
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 msgid "Tags"
 msgstr ""
@@ -2213,7 +2239,6 @@ msgstr ""
 msgid "Total: {0}"
 msgstr "총: {0}"
 
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Track domain expiry dates and DNS status"
 msgstr ""
@@ -2223,8 +2248,8 @@ msgid "Track domain expiry dates and watch domains for purchase"
 msgstr ""
 
 #: src/components/routes/home.tsx
-msgid "Track system resources, containers, and health"
-msgstr ""
+#~ msgid "Track system resources, containers, and health"
+#~ msgstr ""
 
 #: src/components/routes/monitoring.tsx
 msgid "Track uptime, response times, and service health"
@@ -2282,6 +2307,7 @@ msgstr "시스템의 전원이 켜지거나 꺼질때 트리거됩니다."
 msgid "Triggers when usage of any disk exceeds a threshold"
 msgstr "디스크 사용량이 임계값을 초과할 때 트리거됩니다."
 
+#: src/components/monitors-table/monitors-table.tsx
 #: src/components/monitors-table/monitors-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -2416,7 +2442,6 @@ msgstr "사용률"
 msgid "Value"
 msgstr "값"
 
-#: src/components/monitors-table/monitors-table.tsx
 #: src/components/systems-table/systems-table.tsx
 msgid "View"
 msgstr "보기"
@@ -2468,7 +2493,6 @@ msgstr "경고 임계값"
 msgid "Webhook / Push notifications"
 msgstr "Webhook / 푸시 알림"
 
-#: src/components/routes/home.tsx
 #: src/components/routes/monitoring.tsx
 msgid "Website & Service Monitoring"
 msgstr ""
