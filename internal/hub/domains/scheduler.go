@@ -334,66 +334,38 @@ func (s *Scheduler) checkDomain(record *core.Record) error {
 		}
 	}
 
-	// Discover and save subdomains
-	s.discoverSubdomains(record, domainName, userID)
+	// Discover and save subdomains using enhanced discovery
+	s.discoverSubdomainsEnhanced(record, domainName, userID)
 
 	log.Printf("[domain-scheduler] Updated domain: %s (status: %s)", domainName, status)
 	return nil
 }
 
-// discoverSubdomains discovers and saves subdomains for a domain
+// discoverSubdomains discovers and saves subdomains for a domain (legacy method)
 func (s *Scheduler) discoverSubdomains(record *core.Record, domainName, userID string) {
-	// Common subdomains to check
-	commonSubdomains := []string{
-		"www", "mail", "ftp", "api", "blog", "shop", "admin", "app", "cdn",
-		"static", "dev", "staging", "test", "demo", "docs", "support", "help",
-		"status", "monitor", "grafana", "prometheus", "db", "cache", "redis",
-		"queue", "worker", "backup", "media", "assets", "download", "upload",
-		"git", "gitlab", "github", "jenkins", "ci", "cd", "vpn", "ssh",
-		"smtp", "imap", "mx", "webmail", "email", "analytics", "stats",
-		"search", "login", "auth", "sso", "oauth", "account", "user",
-	}
+	// Deprecated: Use discoverSubdomainsEnhanced instead
+	s.discoverSubdomainsEnhanced(record, domainName, userID)
+}
 
-	// Get existing subdomains to avoid duplicates
-	existing, _ := s.app.FindAllRecords("subdomains",
-		dbx.NewExp("domain = {:domain}", dbx.Params{"domain": record.Id}),
-	)
-	existingMap := make(map[string]bool)
-	for _, sub := range existing {
-		existingMap[sub.GetString("subdomain_name")] = true
-	}
+// discoverSubdomainsEnhanced performs enhanced subdomain discovery
+func (s *Scheduler) discoverSubdomainsEnhanced(record *core.Record, domainName, userID string) {
+	discovery := NewSubdomainDiscovery(s.app)
 
-	collection, err := s.app.FindCollectionByNameOrId("subdomains")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	results, err := discovery.Discover(ctx, domainName)
 	if err != nil {
+		log.Printf("[domain-scheduler] Subdomain discovery failed for %s: %v", domainName, err)
 		return
 	}
 
-	for _, sub := range commonSubdomains {
-		if existingMap[sub] {
-			continue
-		}
-
-		fullDomain := sub + "." + domainName
-		ips, err := net.LookupHost(fullDomain)
-		if err != nil || len(ips) == 0 {
-			continue
-		}
-
-		// Found a valid subdomain
-		subRecord := core.NewRecord(collection)
-		subRecord.Set("domain", record.Id)
-		subRecord.Set("subdomain_name", sub)
-		subRecord.Set("status", "active")
-		subRecord.Set("ip_addresses", strings.Join(ips, ","))
-		subRecord.Set("last_checked", time.Now())
-		subRecord.Set("user", userID)
-
-		if err := s.app.Save(subRecord); err != nil {
-			log.Printf("[domain-scheduler] Failed to save subdomain %s: %v", fullDomain, err)
-		} else {
-			log.Printf("[domain-scheduler] Discovered subdomain: %s", fullDomain)
-		}
+	if err := discovery.SaveSubdomains(record, results, userID); err != nil {
+		log.Printf("[domain-scheduler] Failed to save subdomains for %s: %v", domainName, err)
+		return
 	}
+
+	log.Printf("[domain-scheduler] Discovered %d subdomains for %s", len(results), domainName)
 }
 
 // trackChanges compares old and new data and returns history entries

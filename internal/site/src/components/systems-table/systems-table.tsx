@@ -148,11 +148,7 @@ export default function SystemsTable() {
 						</CardDescription>
 					</div>
 
-					<div className="flex gap-2 ms-auto w-full md:w-80">
-						<Button onClick={() => setIsAddDialogOpen(true)} className="shrink-0">
-							<PlusIcon className="mr-2 h-4 w-4" />
-							<Trans>Add System</Trans>
-						</Button>
+					<div className="flex gap-2 ms-auto w-full md:w-96">
 						<div className="relative flex-1">
 							<Input
 								placeholder={t`Filter...`}
@@ -292,6 +288,10 @@ export default function SystemsTable() {
 								</div>
 							</DropdownMenuContent>
 						</DropdownMenu>
+						<Button onClick={() => setIsAddDialogOpen(true)} className="shrink-0">
+							<PlusIcon className="mr-2 h-4 w-4" />
+							<Trans>Add System</Trans>
+						</Button>
 					</div>
 				</div>
 			</CardHeader>
@@ -396,7 +396,6 @@ const AllSystemsTable = memo(
 )
 
 function SystemsTableHead({ table }: { table: TableType<SystemRecord> }) {
-	const { t } = useLingui()
 	return (
 		<TableHeader className="sticky top-0 z-50 w-full border-b-2">
 			{table.getHeaderGroups().map((headerGroup) => (

@@ -75,6 +75,140 @@ import { cn } from "@/lib/utils"
 
 type HeartbeatRow = Heartbeat & { timestamp?: string }
 
+// Uptime Bar Component - Visual timeline of recent checks
+function UptimeBarVisualization({ heartbeats }: { heartbeats?: HeartbeatRow[] }) {
+	const recent = useMemo(() => {
+		if (!heartbeats?.length) return []
+		return heartbeats.slice(0, 30).reverse()
+	}, [heartbeats])
+
+	if (!recent.length) {
+		return (
+			<div className="flex gap-0.5 h-8 items-center">
+				{Array.from({ length: 12 }).map((_, i) => (
+					<div key={i} className="flex-1 h-6 rounded-sm bg-muted/50" />
+				))}
+			</div>
+		)
+	}
+
+	return (
+		<div className="space-y-2">
+			<div className="flex gap-0.5 h-8">
+				{recent.map((hb, i) => (
+					<div
+						key={i}
+						className={cn(
+							"flex-1 rounded-sm transition-all hover:opacity-80 cursor-pointer",
+							hb.status === "up" ? "bg-green-500" : 
+							hb.status === "down" ? "bg-red-500" : 
+							hb.status === "paused" ? "bg-gray-400" : "bg-yellow-500"
+						)}
+						title={`${hb.status} • ${formatPing(hb.ping)} • ${formatDate(hb.time || hb.timestamp || "")}`}
+					/>
+				))}
+			</div>
+			<div className="flex justify-between text-xs text-muted-foreground">
+				<span>{recent.length} recent checks</span>
+				<span>
+					<span className="inline-flex items-center gap-1">
+						<span className="w-2 h-2 rounded-full bg-green-500" />
+						{recent.filter(h => h.status === "up").length} up
+					</span>
+					<span className="inline-flex items-center gap-1 ml-3">
+						<span className="w-2 h-2 rounded-full bg-red-500" />
+						{recent.filter(h => h.status === "down").length} down
+					</span>
+				</span>
+			</div>
+		</div>
+	)
+}
+
+// Response time statistics component
+function ResponseTimeStats({ heartbeats }: { heartbeats?: HeartbeatRow[] }) {
+	const stats = useMemo(() => {
+		if (!heartbeats?.length) return null
+		const pings = heartbeats.filter(h => h.ping && h.ping > 0).map(h => h.ping)
+		if (!pings.length) return null
+		
+		const sorted = [...pings].sort((a, b) => a - b)
+		const avg = Math.round(pings.reduce((a, b) => a + b, 0) / pings.length)
+		const min = sorted[0]
+		const max = sorted[sorted.length - 1]
+		const p95 = sorted[Math.floor(sorted.length * 0.95)]
+		const p99 = sorted[Math.floor(sorted.length * 0.99)]
+		
+		return { avg, min, max, p95, p99, count: pings.length }
+	}, [heartbeats])
+
+	if (!stats) return null
+
+	return (
+		<div className="grid grid-cols-5 gap-2 text-center">
+			<div className="p-2 bg-muted/50 rounded-lg">
+				<div className="text-xs text-muted-foreground">Avg</div>
+				<div className="text-lg font-semibold">{formatPing(stats.avg)}</div>
+			</div>
+			<div className="p-2 bg-muted/50 rounded-lg">
+				<div className="text-xs text-muted-foreground">Min</div>
+				<div className="text-lg font-semibold text-green-600">{formatPing(stats.min)}</div>
+			</div>
+			<div className="p-2 bg-muted/50 rounded-lg">
+				<div className="text-xs text-muted-foreground">Max</div>
+				<div className="text-lg font-semibold text-red-600">{formatPing(stats.max)}</div>
+			</div>
+			<div className="p-2 bg-muted/50 rounded-lg">
+				<div className="text-xs text-muted-foreground">P95</div>
+				<div className="text-lg font-semibold">{formatPing(stats.p95)}</div>
+			</div>
+			<div className="p-2 bg-muted/50 rounded-lg">
+				<div className="text-xs text-muted-foreground">P99</div>
+				<div className="text-lg font-semibold">{formatPing(stats.p99)}</div>
+			</div>
+		</div>
+	)
+}
+
+// Core Web Vitals placeholder component
+function CoreWebVitalsCard({ url }: { url?: string }) {
+	if (!url) return null
+	
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>Core Web Vitals</CardTitle>
+				<CardDescription>Lighthouse performance metrics (coming soon)</CardDescription>
+				</CardHeader>
+			<CardContent>
+				<div className="grid grid-cols-3 gap-4">
+					<div className="text-center p-4 bg-muted/30 rounded-lg">
+						<div className="text-sm text-muted-foreground mb-1">LCP</div>
+						<div className="text-2xl font-bold text-yellow-500">-</div>
+						<div className="text-xs text-muted-foreground mt-1">Largest Contentful Paint</div>
+					</div>
+					<div className="text-center p-4 bg-muted/30 rounded-lg">
+						<div className="text-sm text-muted-foreground mb-1">FID</div>
+						<div className="text-2xl font-bold text-green-500">-</div>
+						<div className="text-xs text-muted-foreground mt-1">First Input Delay</div>
+					</div>
+					<div className="text-center p-4 bg-muted/30 rounded-lg">
+						<div className="text-sm text-muted-foreground mb-1">CLS</div>
+						<div className="text-2xl font-bold text-green-500">-</div>
+						<div className="text-xs text-muted-foreground mt-1">Cumulative Layout Shift</div>
+					</div>
+				</div>
+				<div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+					<div className="flex items-center gap-2 text-sm text-blue-600">
+						<Activity className="h-4 w-4" />
+						<span>Core Web Vitals monitoring requires additional configuration</span>
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+	)
+}
+
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
 	const configs = {
@@ -420,6 +554,31 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 					icon={Clock}
 				/>
 			</div>
+
+			{/* Uptime Bar & Response Stats */}
+			<div className="grid sm:grid-cols-2 gap-4">
+				<Card>
+					<CardHeader>
+						<CardTitle>Recent Uptime</CardTitle>
+						<CardDescription>Visual timeline of the last 30 checks</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<UptimeBarVisualization heartbeats={heartbeats} />
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader>
+						<CardTitle>Response Time Statistics</CardTitle>
+						<CardDescription>Distribution of response times</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<ResponseTimeStats heartbeats={heartbeats} />
+					</CardContent>
+				</Card>
+			</div>
+
+			{/* Core Web Vitals */}
+			<CoreWebVitalsCard url={monitor.url} />
 
 			{/* Combined Uptime & Response Chart */}
 			<Card>

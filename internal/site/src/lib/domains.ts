@@ -1,5 +1,20 @@
 import { pb } from "./api"
 
+export interface Subdomain {
+	id: string
+	domain: string
+	subdomain_name: string
+	full_domain: string
+	status: "active" | "inactive" | "error"
+	ip_addresses?: string
+	http_status?: number
+	server_header?: string
+	discovery_source: string
+	last_checked?: string
+	created: string
+	updated: string
+}
+
 export interface Domain {
 	id: string
 	domain_name: string
@@ -376,4 +391,66 @@ export function cleanDomain(domain: string): string {
 		.replace(/[/?#:].*$/, "")
 		.toLowerCase()
 		.trim()
+}
+
+// Subdomain API functions
+export async function getDomainSubdomains(domainId: string): Promise<Subdomain[]> {
+	const response = await fetch(`/api/beszel/domains/${domainId}/subdomains`, {
+		headers: {
+			Authorization: `Bearer ${pb.authStore.token}`,
+		},
+	})
+	if (!response.ok) {
+		throw new Error(`Failed to fetch subdomains: ${response.statusText}`)
+	}
+	return response.json()
+}
+
+export async function refreshSubdomainDiscovery(domainId: string): Promise<void> {
+	const response = await fetch(`/api/beszel/domains/${domainId}/discover-subdomains`, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${pb.authStore.token}`,
+		},
+	})
+	if (!response.ok) {
+		throw new Error(`Failed to start subdomain discovery: ${response.statusText}`)
+	}
+}
+
+export async function deleteSubdomain(subdomainId: string): Promise<void> {
+	const response = await fetch(`/api/beszel/subdomains/${subdomainId}`, {
+		method: "DELETE",
+		headers: {
+			Authorization: `Bearer ${pb.authStore.token}`,
+		},
+	})
+	if (!response.ok) {
+		throw new Error(`Failed to delete subdomain: ${response.statusText}`)
+	}
+}
+
+export function extractDomainFromUrl(url: string): string {
+	try {
+		const urlObj = new URL(url.startsWith("http") ? url : `https://${url}`)
+		return urlObj.hostname.toLowerCase()
+	} catch {
+		return cleanDomain(url)
+	}
+}
+
+export function isSubdomain(fullDomain: string, parentDomain: string): boolean {
+	const cleanFull = cleanDomain(fullDomain)
+	const cleanParent = cleanDomain(parentDomain)
+	return cleanFull.endsWith(`.${cleanParent}`) || cleanFull === cleanParent
+}
+
+export function getSubdomainName(fullDomain: string, parentDomain: string): string {
+	const cleanFull = cleanDomain(fullDomain)
+	const cleanParent = cleanDomain(parentDomain)
+	if (cleanFull === cleanParent) return "@"
+	if (cleanFull.endsWith(`.${cleanParent}`)) {
+		return cleanFull.slice(0, -cleanParent.length - 1)
+	}
+	return cleanFull
 }

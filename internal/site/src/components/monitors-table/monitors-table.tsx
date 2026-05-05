@@ -1,6 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
+	AlertTriangle,
 	ArrowDownIcon,
 	ArrowUpIcon,
 	CheckCircleIcon,
@@ -16,6 +17,7 @@ import {
 	Settings2Icon,
 	TagIcon,
 	Trash2Icon,
+	XCircle,
 	XCircleIcon,
 } from "lucide-react"
 import { memo, useMemo, useState } from "react"
@@ -68,7 +70,9 @@ import {
 } from "@/lib/monitors"
 import { cn, useBrowserStorage } from "@/lib/utils"
 import { AddMonitorDialog } from "./add-monitor-dialog"
+import { GroupedMonitorsTable } from "./grouped-monitors-table"
 import { Link } from "@/components/router"
+import { Network } from "lucide-react"
 
 // Status indicator component
 function StatusIndicator({ status }: { status: MonitorStatus }) {
@@ -176,14 +180,26 @@ function MonitorCard({
 				</DropdownMenu>
 			</div>
 
-			<div className="grid grid-cols-2 gap-3 text-sm">
-				<div className="space-y-1">
+			<div className="space-y-3">
+				<div className="flex items-center justify-between">
 					<div className="text-xs text-muted-foreground">Type</div>
 					<div className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium">
 						{getMonitorTypeLabel(monitor.type)}
 					</div>
 				</div>
-				<div className="space-y-1">
+				
+				{/* Uptime - Prominent pill display */}
+				<div className="flex flex-col gap-2">
+					<div className="flex items-center gap-2 flex-wrap">
+						<UptimePill uptime={monitor.uptime_stats?.uptime_24h ?? 100} label="24h" />
+						{monitor.uptime_stats?.uptime_7d !== undefined && monitor.uptime_stats.uptime_7d !== monitor.uptime_stats?.uptime_24h && (
+							<UptimePill uptime={monitor.uptime_stats.uptime_7d} label="7d" />
+						)}
+					</div>
+					<UptimeDots heartbeats={monitor.recent_heartbeats} />
+				</div>
+				
+				<div className="flex items-center justify-between text-sm">
 					<div className="text-xs text-muted-foreground">Response</div>
 					<div>
 						{monitor.last_check ? (
@@ -192,10 +208,6 @@ function MonitorCard({
 							<span className="text-muted-foreground">-</span>
 						)}
 					</div>
-				</div>
-				<div className="col-span-2 space-y-1">
-					<div className="text-xs text-muted-foreground">Uptime (24h)</div>
-					<UptimeBar stats={monitor.uptime_stats} />
 				</div>
 			</div>
 
@@ -265,25 +277,89 @@ function MonitorCard({
 	)
 }
 
-// Uptime bar component
+// Uptime pill badge component - big and visible
+function UptimePill({ uptime, label = "24h" }: { uptime: number; label?: string }) {
+	let colorClass = "bg-green-500/15 text-green-600 border-green-500/30"
+	let icon = <CheckCircleIcon className="h-3.5 w-3.5" />
+	
+	if (uptime < 99.9) {
+		colorClass = "bg-green-500/15 text-green-600 border-green-500/30"
+	}
+	if (uptime < 95) {
+		colorClass = "bg-yellow-500/15 text-yellow-600 border-yellow-500/30"
+		icon = <AlertTriangle className="h-3.5 w-3.5" />
+	}
+	if (uptime < 90) {
+		colorClass = "bg-red-500/15 text-red-600 border-red-500/30"
+		icon = <XCircle className="h-3.5 w-3.5" />
+	}
+
+	return (
+		<div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 ${colorClass}`}>
+			{icon}
+			<span className="text-sm font-bold">{formatUptime(uptime)}</span>
+			<span className="text-[10px] font-medium uppercase opacity-70">{label}</span>
+		</div>
+	)
+}
+
+// Uptime bar component with pill style
 function UptimeBar({ stats }: { stats?: Record<string, number> }) {
 	const uptime24h = stats?.uptime_24h ?? 100
+	const uptime7d = stats?.uptime_7d ?? 100
+	const uptime30d = stats?.uptime_30d ?? 100
 
 	let color = "bg-green-500"
 	if (uptime24h < 95) color = "bg-yellow-500"
 	if (uptime24h < 90) color = "bg-red-500"
 
 	return (
-		<div className="flex items-center gap-2">
-			<div className="h-2 w-16 rounded-full bg-muted overflow-hidden">
-				<div
-					className={cn("h-full transition-all", color)}
-					style={{ width: `${uptime24h}%` }}
-				/>
+		<div className="flex flex-col gap-1.5">
+			<div className="flex items-center gap-2">
+				<UptimePill uptime={uptime24h} label="24h" />
+				{uptime7d !== 100 && uptime7d !== uptime24h && (
+					<UptimePill uptime={uptime7d} label="7d" />
+				)}
+				{uptime30d !== 100 && uptime30d !== uptime24h && uptime30d !== uptime7d && (
+					<UptimePill uptime={uptime30d} label="30d" />
+				)}
 			</div>
-			<span className="text-xs text-muted-foreground w-14">
-				{formatUptime(uptime24h)}
-			</span>
+		</div>
+	)
+}
+
+// Mini uptime dots visualization
+function UptimeDots({ heartbeats }: { heartbeats?: Array<{ status: string; time: string }> }) {
+	if (!heartbeats || heartbeats.length === 0) {
+		return (
+			<div className="flex gap-0.5">
+				{Array.from({ length: 12 }).map((_, i) => (
+					<div key={i} className="h-3 w-2 rounded-sm bg-muted" />
+				))}
+			</div>
+		)
+	}
+
+	// Take last 12 heartbeats
+	const recent = heartbeats.slice(-12)
+
+	return (
+		<div className="flex gap-0.5">
+			{recent.map((hb, i) => (
+				<div
+					key={i}
+					className={cn(
+						"h-3 w-2 rounded-sm transition-colors",
+						hb.status === "up" ? "bg-green-500" : 
+						hb.status === "down" ? "bg-red-500" : 
+						hb.status === "paused" ? "bg-gray-400" : "bg-yellow-500"
+					)}
+					title={`${hb.status} at ${new Date(hb.time).toLocaleString()}`}
+				/>
+			))}
+			{recent.length < 12 && Array.from({ length: 12 - recent.length }).map((_, i) => (
+				<div key={`empty-${i}`} className="h-3 w-2 rounded-sm bg-muted" />
+			))}
 		</div>
 	)
 }
@@ -456,7 +532,7 @@ function MonitorRow({
 	)
 }
 
-type ViewMode = "table" | "grid"
+type ViewMode = "table" | "grid" | "network"
 type StatusFilter = "all" | MonitorStatus
 type TypeFilter = "all" | MonitorType
 
@@ -669,6 +745,10 @@ export default memo(function MonitorsTable() {
 										<LayoutGridIcon className="size-4" />
 										<Trans>Grid</Trans>
 									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="network" className="gap-2">
+										<Network className="size-4" />
+										<Trans>Network (Grouped)</Trans>
+									</DropdownMenuRadioItem>
 								</DropdownMenuRadioGroup>
 								<DropdownMenuSeparator />
 
@@ -727,6 +807,8 @@ export default memo(function MonitorsTable() {
 							</div>
 						)}
 					</div>
+				) : viewMode === "network" ? (
+					<GroupedMonitorsTable />
 				) : viewMode === "table" ? (
 					<Table>
 						<TableHeader>

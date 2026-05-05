@@ -51,6 +51,7 @@ export interface Monitor {
 	description?: string
 	last_check?: string
 	uptime_stats?: Record<string, number>
+	recent_heartbeats?: Array<{ status: string; time: string; ping?: number }>
 	tags?: string[]
 	keyword?: string
 	json_query?: string
@@ -337,4 +338,99 @@ export function formatPing(ping: number): string {
 	if (ping === undefined || ping === null) return "N/A"
 	if (ping < 1000) return `${ping}ms`
 	return `${(ping / 1000).toFixed(2)}s`
+}
+
+// Domain extraction and grouping utilities
+export function extractHostnameFromMonitor(monitor: Monitor): string | null {
+	if (monitor.hostname) {
+		return monitor.hostname.toLowerCase()
+	}
+	if (monitor.url) {
+		try {
+			const url = new URL(monitor.url.startsWith("http") ? monitor.url : `https://${monitor.url}`)
+			return url.hostname.toLowerCase()
+		} catch {
+			return monitor.url.toLowerCase()
+		}
+	}
+	return null
+}
+
+export function getDomainFromHostname(hostname: string): string {
+	// Remove www prefix
+	const clean = hostname.replace(/^www\./, "")
+	// Extract root domain (last 2 parts for most domains, last 3 for co.uk etc)
+	const parts = clean.split(".")
+	if (parts.length <= 2) {
+		return clean
+	}
+	// Handle special TLDs
+	const specialTLDs = ["co.uk", "com.au", "co.jp", "com.br", "co.nz", "co.za", "co.in", "com.cn"]
+	const lastTwo = parts.slice(-2).join(".")
+	const lastThree = parts.slice(-3).join(".")
+	if (specialTLDs.includes(lastThree)) {
+		return lastThree
+	}
+	return lastTwo
+}
+
+export function isSubdomain(hostname: string, domain: string): boolean {
+	const cleanHostname = hostname.toLowerCase().replace(/^www\./, "")
+	const cleanDomain = domain.toLowerCase().replace(/^www\./, "")
+	return cleanHostname.endsWith(`.${cleanDomain}`) || cleanHostname === cleanDomain
+}
+
+export function getSubdomainPart(hostname: string, domain: string): string | null {
+	const cleanHostname = hostname.toLowerCase().replace(/^www\./, "")
+	const cleanDomain = domain.toLowerCase().replace(/^www\./, "")
+	if (cleanHostname === cleanDomain) {
+		return "@" // Root domain
+	}
+	if (cleanHostname.endsWith(`.${cleanDomain}`)) {
+		return cleanHostname.slice(0, -cleanDomain.length - 1)
+	}
+	return null
+}
+
+export interface GroupedMonitors {
+	domain: string
+	isRootDomain: boolean
+	monitors: Monitor[]
+	subdomains: Map<string, Monitor[]>
+}
+
+export function groupMonitorsByDomain(monitors: Monitor[]): Map<string, GroupedMonitors> {
+	const groups = new Map<string, GroupedMonitors>()
+
+	for (const monitor of monitors) {
+		const hostname = extractHostnameFromMonitor(monitor)
+		if (!hostname) continue
+
+		const rootDomain = getDomainFromHostname(hostname)
+		const subdomain = getSubdomainPart(hostname, rootDomain)
+
+		if (!groups.has(rootDomain)) {
+			groups.set(rootDomain, {
+				domain: rootDomain,
+				isRootDomain: true,
+				monitors: [],
+				subdomains: new Map(),
+			})
+		}
+
+		const group = groups.get(rootDomain)!
+
+		if (subdomain === "@" || subdomain === null) {
+			// Root domain monitor
+			group.monitors.push(monitor)
+		} else {
+			// Subdomain monitor
+			if (!group.subdomains.has(subdomain)) {
+				group.subdomains.set(subdomain, [])
+			}
+			group.subdomains.get(subdomain)!.push(monitor)
+		}
+	}
+
+	return groups
 }

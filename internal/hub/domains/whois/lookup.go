@@ -438,11 +438,31 @@ func (s *LookupService) parseWHOISOutput(output, domainName string) (*domain.WHO
 		}
 	}
 
-	// Extract dates
-	expiryDate := s.parseDate(data["registry_expiry_date"], data["registrar_registration_expiration_date"],
-		data["expiry_date"], data["expiration_time"], data["expire"], data["paid_until"])
-	creationDate := s.parseDate(data["creation_date"], data["created_date"], data["registration_time"])
-	updatedDate := s.parseDate(data["updated_date"], data["last_updated"])
+	// Extract dates - try many field name variations used by different registries
+	expiryDate := s.parseDate(
+		data["registry_expiry_date"],
+		data["registrar_registration_expiration_date"],
+		data["expiry_date"],
+		data["expiration_time"],
+		data["expire"],
+		data["paid_until"],
+		data["expire_date"],
+		data["renewal_date"],
+		data["valid_until"],
+	)
+	creationDate := s.parseDate(
+		data["creation_date"],
+		data["created_date"],
+		data["registration_time"],
+		data["registered_on"],
+		data["domain_registered"],
+	)
+	updatedDate := s.parseDate(
+		data["updated_date"],
+		data["last_updated"],
+		data["last_modified"],
+		data["modified_date"],
+	)
 
 	// Extract registrar - try multiple field names used by different WHOIS servers
 	registrarName := data["registrar"]
@@ -454,6 +474,15 @@ func (s *LookupService) parseWHOISOutput(output, domainName string) (*domain.WHO
 	}
 	if registrarName == "" {
 		registrarName = data["registrar_organization"]
+	}
+	if registrarName == "" {
+		registrarName = data["registrant_organization"]
+	}
+	if registrarName == "" {
+		registrarName = data["registrar_url"]
+	}
+	if registrarName == "" {
+		registrarName = data["registrar_abuse_contact_email"]
 	}
 	if registrarName == "" {
 		registrarName = "Unknown"
@@ -477,15 +506,30 @@ func (s *LookupService) parseWHOISOutput(output, domainName string) (*domain.WHO
 		PostalCode:   data["registrant_postal_code"],
 	}
 
-	// Try alternate field names for registrant
+	// Try alternate field names for registrant (.eu uses "holder", other variations)
 	if registrant.Name == "" {
 		registrant.Name = data["registrant"]
+	}
+	if registrant.Name == "" {
+		registrant.Name = data["holder"]
+	}
+	if registrant.Name == "" {
+		registrant.Name = data["domain_holder"]
 	}
 	if registrant.Organization == "" {
 		registrant.Organization = data["org"]
 	}
+	if registrant.Organization == "" {
+		registrant.Organization = data["organization"]
+	}
+	if registrant.Organization == "" {
+		registrant.Organization = data["holder_org"]
+	}
 	if registrant.Country == "" {
 		registrant.Country = data["country"]
+	}
+	if registrant.Country == "" {
+		registrant.Country = data["holder_country"]
 	}
 
 	// Parse DNSSEC more thoroughly

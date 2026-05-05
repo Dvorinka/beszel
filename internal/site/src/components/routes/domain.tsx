@@ -46,6 +46,7 @@ import {
 } from "@/lib/domains"
 import { Link, navigate } from "@/components/router"
 import { DomainDialog } from "@/components/domains-table/domain-dialog"
+import { SubdomainList } from "@/components/domains-table/subdomain-list"
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
@@ -850,6 +851,9 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 					</CardContent>
 				</Card>
 			</div>
+
+			{/* Subdomains Section */}
+			<SubdomainList domainId={domain.id} />
 
 			<Card>
 				<CardHeader>

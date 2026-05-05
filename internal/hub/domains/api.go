@@ -43,6 +43,11 @@ func (h *APIHandler) RegisterRoutes(se *core.ServeEvent) {
 	api.GET("/{id}/stats", h.getDomainStats)
 	api.POST("/{id}/pause", h.pauseDomain)
 	api.POST("/{id}/resume", h.resumeDomain)
+	api.GET("/{id}/subdomains", h.getDomainSubdomains)
+	api.POST("/{id}/discover-subdomains", h.discoverSubdomains)
+
+	// Subdomain routes
+	api.DELETE("/subdomains/{subdomainId}", h.deleteSubdomain)
 }
 
 // listDomains lists all domains for the authenticated user
@@ -704,4 +709,105 @@ func cleanDomain(domain string) string {
 		domain = domain[:idx]
 	}
 	return strings.ToLower(strings.TrimSpace(domain))
+}
+
+// getDomainSubdomains returns all subdomains for a domain
+func (h *APIHandler) getDomainSubdomains(e *core.RequestEvent) error {
+	authRecord := e.Auth
+	if authRecord == nil {
+		return e.UnauthorizedError("unauthorized", nil)
+	}
+
+	domainID := e.Request.PathValue("id")
+
+	// Verify domain ownership
+	domain, err := h.app.FindRecordById("domains", domainID)
+	if err != nil {
+		return e.NotFoundError("domain not found", err)
+	}
+	if domain.GetString("user") != authRecord.Id {
+		return e.ForbiddenError("not authorized", nil)
+	}
+
+	records, err := h.app.FindAllRecords("subdomains",
+		dbx.NewExp("domain = {:domain}", dbx.Params{"domain": domainID}),
+	)
+	if err != nil {
+		return e.InternalServerError("failed to fetch subdomains", err)
+	}
+
+	subdomains := make([]map[string]interface{}, 0, len(records))
+	for _, record := range records {
+		subdomains = append(subdomains, map[string]interface{}{
+			"id":               record.Id,
+			"domain":           record.GetString("domain"),
+			"subdomain_name":   record.GetString("subdomain_name"),
+			"full_domain":      record.GetString("full_domain"),
+			"status":           record.GetString("status"),
+			"ip_addresses":     record.GetString("ip_addresses"),
+			"http_status":      record.GetInt("http_status"),
+			"server_header":    record.GetString("server_header"),
+			"discovery_source": record.GetString("discovery_source"),
+			"last_checked":     record.GetDateTime("last_checked").Time(),
+			"created":          record.GetDateTime("created").Time(),
+			"updated":          record.GetDateTime("updated").Time(),
+		})
+	}
+
+	return e.JSON(http.StatusOK, subdomains)
+}
+
+// discoverSubdomains triggers subdomain discovery for a domain
+func (h *APIHandler) discoverSubdomains(e *core.RequestEvent) error {
+	authRecord := e.Auth
+	if authRecord == nil {
+		return e.UnauthorizedError("unauthorized", nil)
+	}
+
+	domainID := e.Request.PathValue("id")
+
+	// Verify domain ownership
+	domain, err := h.app.FindRecordById("domains", domainID)
+	if err != nil {
+		return e.NotFoundError("domain not found", err)
+	}
+	if domain.GetString("user") != authRecord.Id {
+		return e.ForbiddenError("not authorized", nil)
+	}
+
+	// Trigger discovery asynchronously
+	go func() {
+		domainName := domain.GetString("domain_name")
+		userID := authRecord.Id
+		h.scheduler.discoverSubdomainsEnhanced(domain, domainName, userID)
+	}()
+
+	return e.JSON(http.StatusOK, map[string]string{"status": "discovery_started"})
+}
+
+// deleteSubdomain deletes a subdomain
+func (h *APIHandler) deleteSubdomain(e *core.RequestEvent) error {
+	authRecord := e.Auth
+	if authRecord == nil {
+		return e.UnauthorizedError("unauthorized", nil)
+	}
+
+	subdomainID := e.Request.PathValue("subdomainId")
+
+	// Get subdomain
+	subdomain, err := h.app.FindRecordById("subdomains", subdomainID)
+	if err != nil {
+		return e.NotFoundError("subdomain not found", err)
+	}
+
+	// Verify ownership
+	if subdomain.GetString("user") != authRecord.Id {
+		return e.ForbiddenError("not authorized", nil)
+	}
+
+	if err := h.app.Delete(subdomain); err != nil {
+		return e.InternalServerError("failed to delete subdomain", err)
+	}
+
+	return e.NoContent(http.StatusNoContent)
 }

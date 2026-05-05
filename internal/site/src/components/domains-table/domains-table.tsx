@@ -39,6 +39,7 @@ import {
 	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
+	DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -49,7 +50,6 @@ import {
 	getStatusBadgeColor,
 	getStatusLabel,
 	formatDate,
-	formatDays,
 	type Domain,
 } from "@/lib/domains"
 import {
@@ -72,6 +72,37 @@ import { useBrowserStorage } from "@/lib/utils"
 type ViewMode = "table" | "grid"
 type StatusFilter = "all" | "active" | "expiring" | "expired" | "unknown" | "paused"
 
+type DisplayOptions = {
+	showSSL: boolean
+	showRegistrar: boolean
+	showExpiryDate: boolean
+	showTags: boolean
+}
+
+// Days left badge component - big and visible
+function DaysLeftBadge({ days, label = "days" }: { days: number | undefined; label?: string }) {
+	if (days === undefined || days === null) return <span className="text-muted-foreground">-</span>
+	
+	const isCritical = days >= 0 && days <= 7
+	const isWarning = days >= 0 && days <= 30
+	const isExpired = days < 0
+	
+	const colorClass = isExpired 
+		? "bg-red-500/15 text-red-600 border-red-500/30"
+		: isCritical 
+			? "bg-red-500/15 text-red-600 border-red-500/30"
+			: isWarning 
+				? "bg-yellow-500/15 text-yellow-600 border-yellow-500/30"
+				: "bg-green-500/15 text-green-600 border-green-500/30"
+	
+	return (
+		<div className={`inline-flex flex-col items-center justify-center px-3 py-1.5 rounded-lg border-2 ${colorClass} min-w-[70px]`}>
+			<span className="text-lg font-bold leading-none">{isExpired ? Math.abs(days) : days}</span>
+			<span className="text-[10px] font-medium uppercase tracking-wide opacity-80">{isExpired ? "EXPIRED" : days === 1 ? "DAY" : label.toUpperCase()}</span>
+		</div>
+	)
+}
+
 export default function DomainsTable() {
 	const { t } = useLingui()
 	const { toast } = useToast()
@@ -86,6 +117,11 @@ export default function DomainsTable() {
 	const [viewMode, setViewMode] = useBrowserStorage<ViewMode>(
 		"domainsViewMode",
 		window.innerWidth < 1024 ? "grid" : "table"
+	)
+	
+	const [displayOptions, setDisplayOptions] = useBrowserStorage<DisplayOptions>(
+		"domainsDisplayOptions",
+		{ showSSL: true, showRegistrar: true, showExpiryDate: true, showTags: true }
 	)
 
 	const { data: domains = [], isLoading } = useQuery({
@@ -346,6 +382,37 @@ export default function DomainsTable() {
 										</DropdownMenuRadioItem>
 									)}
 								</DropdownMenuRadioGroup>
+								<DropdownMenuSeparator />
+								
+								{/* Display Options */}
+								<DropdownMenuLabel className="flex items-center gap-2">
+									<FilterIcon className="size-4" />
+									<Trans>Display Columns</Trans>
+								</DropdownMenuLabel>
+								<DropdownMenuCheckboxItem
+									checked={displayOptions.showSSL}
+									onCheckedChange={(checked: boolean) => setDisplayOptions({ ...displayOptions, showSSL: checked })}
+								>
+									SSL Info
+								</DropdownMenuCheckboxItem>
+								<DropdownMenuCheckboxItem
+									checked={displayOptions.showRegistrar}
+									onCheckedChange={(checked: boolean) => setDisplayOptions({ ...displayOptions, showRegistrar: checked })}
+								>
+									Registrar
+								</DropdownMenuCheckboxItem>
+								<DropdownMenuCheckboxItem
+									checked={displayOptions.showExpiryDate}
+									onCheckedChange={(checked: boolean) => setDisplayOptions({ ...displayOptions, showExpiryDate: checked })}
+								>
+									Expiry Date
+								</DropdownMenuCheckboxItem>
+								<DropdownMenuCheckboxItem
+									checked={displayOptions.showTags}
+									onCheckedChange={(checked: boolean) => setDisplayOptions({ ...displayOptions, showTags: checked })}
+								>
+									Tags
+								</DropdownMenuCheckboxItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
 					</div>
@@ -374,11 +441,11 @@ export default function DomainsTable() {
 									<TableRow>
 										<TableHead>Domain</TableHead>
 										<TableHead>Status</TableHead>
-										<TableHead>Expiry</TableHead>
+										{displayOptions.showExpiryDate && <TableHead>Expiry</TableHead>}
 										<TableHead>Days Left</TableHead>
-										<TableHead>Registrar</TableHead>
-										<TableHead>SSL Expiry</TableHead>
-										<TableHead>Tags</TableHead>
+										{displayOptions.showRegistrar && <TableHead>Registrar</TableHead>}
+										{displayOptions.showSSL && <TableHead>SSL Expiry</TableHead>}
+										{displayOptions.showTags && <TableHead>Tags</TableHead>}
 										<TableHead className="w-[100px]">Actions</TableHead>
 									</TableRow>
 									</TableHeader>
@@ -406,49 +473,41 @@ export default function DomainsTable() {
 														</Badge>
 													</div>
 												</TableCell>
+												{displayOptions.showExpiryDate && (
+													<TableCell>
+														{domain.expiry_date ? formatDate(domain.expiry_date) : "Unknown"}
+													</TableCell>
+												)}
 												<TableCell>
-													{domain.expiry_date ? formatDate(domain.expiry_date) : "Unknown"}
+													<DaysLeftBadge days={domain.days_until_expiry} />
 												</TableCell>
-												<TableCell>
-											<span className={
-															domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
-															? domain.days_until_expiry <= 7
-																? "text-red-600 font-semibold"
-																: "text-yellow-600"
-															: ""
-												}>
-													{formatDays(domain.days_until_expiry)}
-												</span>
-											</TableCell>
-										<TableCell>{domain.registrar_name || "Unknown"}</TableCell>
-										<TableCell>
-											{domain.ssl_valid_to ? (
-												<span
-													className={
-														domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 14
-														? "text-red-600"
-														: ""
-													}
-												>
-													{formatDays(domain.ssl_days_until)}
-												</span>
-											) : (
-												"N/A"
-											)}
-										</TableCell>
-												<TableCell>
-													<div className="flex flex-wrap gap-1">
-														{domain.tags?.map((tag: string) => (
-															<span
-																key={tag}
-																className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium"
-															>
-																<Tag className="h-3 w-3" />
-																{tag}
-															</span>
-														))}
-													</div>
-												</TableCell>
+												{displayOptions.showRegistrar && (
+													<TableCell>{domain.registrar_name || "Unknown"}</TableCell>
+												)}
+												{displayOptions.showSSL && (
+													<TableCell>
+														{domain.ssl_valid_to ? (
+															<DaysLeftBadge days={domain.ssl_days_until} label="ssl" />
+														) : (
+															<span className="text-muted-foreground">-</span>
+														)}
+													</TableCell>
+												)}
+												{displayOptions.showTags && (
+													<TableCell>
+														<div className="flex flex-wrap gap-1">
+															{domain.tags?.map((tag: string) => (
+																<span
+																	key={tag}
+																	className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium"
+																>
+																	<Tag className="h-3 w-3" />
+																	{tag}
+																</span>
+															))}
+														</div>
+													</TableCell>
+												)}
 												<TableCell>
 													<DropdownMenu>
 														<DropdownMenuTrigger asChild>
@@ -535,7 +594,7 @@ export default function DomainsTable() {
 											</Badge>
 										</div>
 
-										{domain.tags && domain.tags.length > 0 && (
+										{displayOptions.showTags && domain.tags && domain.tags.length > 0 && (
 											<div className="flex flex-wrap gap-1">
 												{domain.tags.map((tag: string) => (
 													<span
@@ -549,30 +608,20 @@ export default function DomainsTable() {
 											</div>
 										)}
 
-										<div className="grid grid-cols-2 gap-2 text-sm">
-											<div>
-												<div className="text-xs text-muted-foreground">Days Left</div>
-												<span className={
-												domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
-													? domain.days_until_expiry <= 7
-														? "text-red-600 font-semibold"
-														: "text-yellow-600"
-													: ""
-											}>
-												{formatDays(domain.days_until_expiry)}
-											</span>
+										<div className="grid gap-2 text-sm">
+											<div className="flex items-center justify-between">
+												{displayOptions.showExpiryDate && (
+													<span className="text-xs text-muted-foreground">{domain.expiry_date ? formatDate(domain.expiry_date) : "Unknown"}</span>
+												)}
+												{displayOptions.showRegistrar && (
+													<span className="text-xs text-muted-foreground truncate max-w-[120px]">{domain.registrar_name || "Unknown"}</span>
+												)}
 											</div>
-											<div>
-												<div className="text-xs text-muted-foreground">SSL</div>
-												<span
-													className={
-														domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 14
-														? "text-red-600"
-														: ""
-													}
-												>
-													{formatDays(domain.ssl_days_until)}
-												</span>
+											<div className="flex gap-2">
+												<DaysLeftBadge days={domain.days_until_expiry} />
+												{displayOptions.showSSL && domain.ssl_valid_to && (
+													<DaysLeftBadge days={domain.ssl_days_until} label="ssl" />
+												)}
 											</div>
 										</div>
 									</div>

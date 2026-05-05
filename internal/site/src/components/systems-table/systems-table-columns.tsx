@@ -6,7 +6,6 @@ import { getPagePath } from "@nanostores/router"
 import type { CellContext, ColumnDef, HeaderContext } from "@tanstack/react-table"
 import type { ClassValue } from "clsx"
 import {
-	ArrowUpDownIcon,
 	ChevronRightSquareIcon,
 	ClockArrowUp,
 	CopyIcon,
@@ -265,7 +264,6 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			id: "temp",
 			name: () => t({ message: "Temp", comment: "Temperature label in systems table" }),
 			size: 50,
-			hideSort: true,
 			Icon: ThermometerIcon,
 			header: sortableHeader,
 			cell(info) {
@@ -289,7 +287,6 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			size: 70,
 			Icon: BatteryMediumIcon,
 			header: sortableHeader,
-			hideSort: true,
 			cell(info) {
 				const [pct, state] = info.row.original.info.bat ?? []
 				if (pct === undefined) {
@@ -335,7 +332,6 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			size: 50,
 			Icon: TerminalSquareIcon,
 			header: sortableHeader,
-			hideSort: true,
 			sortingFn: (a, b) => {
 				// sort priorities: 1) failed services, 2) total services
 				const [totalCountA, numFailedA] = a.original.info.sv ?? [0, 0]
@@ -374,7 +370,6 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			size: 50,
 			Icon: ClockArrowUp,
 			header: sortableHeader,
-			hideSort: true,
 			cell(info) {
 				const uptime = info.getValue() as number
 				if (!uptime) {
@@ -389,7 +384,6 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			name: () => t`Agent`,
 			size: 50,
 			Icon: WifiIcon,
-			hideSort: true,
 			header: sortableHeader,
 			cell(info) {
 				const version = info.getValue() as string
@@ -443,17 +437,16 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 function sortableHeader(context: HeaderContext<SystemRecord, unknown>) {
 	const { column } = context
 	// @ts-expect-error
-	const { Icon, hideSort, name }: { Icon: React.ElementType; name: () => string; hideSort: boolean } = column.columnDef
+	const { Icon, name }: { Icon: React.ElementType; name: () => string } = column.columnDef
 	const isSorted = column.getIsSorted()
 	return (
 		<Button
 			variant="ghost"
-			className={cn("h-9 px-3 flex duration-50", isSorted && "bg-accent/70 light:bg-accent text-accent-foreground/90")}
+			className={cn("h-9 px-3 flex items-center gap-2 duration-50", isSorted && "bg-accent/70 light:bg-accent text-accent-foreground/90")}
 			onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
 		>
-			{Icon && <Icon className="me-2 size-4" />}
+			{Icon && <Icon className="size-4" />}
 			{name()}
-			{hideSort || <ArrowUpDownIcon className="ms-2 size-4" />}
 		</Button>
 	)
 }

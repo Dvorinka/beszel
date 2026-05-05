@@ -52,6 +52,13 @@ func (h *APIHandler) RegisterRoutes(se *core.ServeEvent) {
 	api.GET("/:id/heartbeats", h.getHeartbeats)
 }
 
+// HeartbeatSummary represents a minimal heartbeat for the monitor list
+type HeartbeatSummary struct {
+	Status string    `json:"status"`
+	Ping   int       `json:"ping"`
+	Time   time.Time `json:"time"`
+}
+
 // MonitorResponse represents a monitor in API responses
 type MonitorResponse struct {
 	ID                     string             `json:"id"`
@@ -69,6 +76,7 @@ type MonitorResponse struct {
 	Description            string             `json:"description,omitempty"`
 	LastCheck              *time.Time         `json:"last_check,omitempty"`
 	UptimeStats            map[string]float64 `json:"uptime_stats,omitempty"`
+	RecentHeartbeats       []HeartbeatSummary `json:"recent_heartbeats,omitempty"`
 	Tags                   []string           `json:"tags,omitempty"`
 	Keyword                string             `json:"keyword,omitempty"`
 	JSONQuery              string             `json:"json_query,omitempty"`
@@ -165,6 +173,35 @@ func (h *APIHandler) listMonitors(e *core.RequestEvent) error {
 	})
 }
 
+// getRecentHeartbeats fetches the last N heartbeats for a monitor
+func (h *APIHandler) getRecentHeartbeats(monitorID string, limit int) []HeartbeatSummary {
+	records, err := h.app.FindRecordsByFilter(
+		"monitor_heartbeats",
+		"monitor = {:monitorId}",
+		"-time",
+		limit,
+		0,
+		map[string]any{"monitorId": monitorID},
+	)
+	if err != nil {
+		return nil
+	}
+
+	heartbeats := make([]HeartbeatSummary, 0, len(records))
+	for _, hb := range records {
+		var t time.Time
+		if ts := hb.GetDateTime("time"); !ts.IsZero() {
+			t = ts.Time()
+		}
+		heartbeats = append(heartbeats, HeartbeatSummary{
+			Status: hb.GetString("status"),
+			Ping:   hb.GetInt("ping"),
+			Time:   t,
+		})
+	}
+	return heartbeats
+}
+
 // getMonitor returns a single monitor by ID
 func (h *APIHandler) getMonitor(e *core.RequestEvent) error {
 	id := e.Request.PathValue("id")
@@ -182,7 +219,10 @@ func (h *APIHandler) getMonitor(e *core.RequestEvent) error {
 		return e.ForbiddenError("Access denied", nil)
 	}
 
-	return e.JSON(http.StatusOK, recordToResponse(record))
+	resp := recordToResponse(record)
+	resp.RecentHeartbeats = h.getRecentHeartbeats(id, 12)
+
+	return e.JSON(http.StatusOK, resp)
 }
 
 // createMonitor creates a new monitor
