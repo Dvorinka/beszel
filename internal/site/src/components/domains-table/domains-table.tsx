@@ -88,17 +88,17 @@ function DaysLeftBadge({ days, label = "days" }: { days: number | undefined; lab
 	const isExpired = days < 0
 	
 	const colorClass = isExpired 
-		? "bg-red-500 text-white border-red-600"
+		? "bg-red-500/15 text-red-600 border-red-500/30"
 		: isCritical 
-			? "bg-red-500 text-white border-red-600"
+			? "bg-red-500/15 text-red-600 border-red-500/30"
 			: isWarning 
-				? "bg-yellow-500 text-white border-yellow-600"
-				: "bg-green-500 text-white border-green-600"
+				? "bg-yellow-500/15 text-yellow-600 border-yellow-500/30"
+				: "bg-green-500/15 text-green-600 border-green-500/30"
 	
 	return (
 		<div className={`inline-flex flex-col items-center justify-center px-3 py-1.5 rounded-lg border-2 ${colorClass} min-w-[70px]`}>
 			<span className="text-lg font-bold leading-none">{isExpired ? Math.abs(days) : days}</span>
-			<span className="text-[10px] font-medium uppercase tracking-wide opacity-90">{isExpired ? "EXPIRED" : days === 1 ? "DAY" : label.toUpperCase()}</span>
+			<span className="text-[10px] font-medium uppercase tracking-wide opacity-80">{isExpired ? "EXPIRED" : days === 1 ? "DAY" : label.toUpperCase()}</span>
 		</div>
 	)
 }
@@ -552,104 +552,80 @@ export default function DomainsTable() {
 							</div>
 						) : (
 							<div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-								{filteredDomains.map((domain) => {
-									const isExpired = domain.status === "expired"
-									const isExpiring = domain.status === "expiring"
-									const isActive = domain.status === "active"
-									
-									const cardGradient = isExpired 
-										? "from-red-500/5 to-red-500/10 border-red-500/20" 
-										: isExpiring 
-											? "from-yellow-500/5 to-yellow-500/10 border-yellow-500/20" 
-											: isActive 
-												? "from-green-500/5 to-green-500/10 border-green-500/20" 
-												: "from-gray-500/5 to-gray-500/10 border-gray-500/20"
-									
-									return (
-										<div key={domain.id} className={`rounded-lg border bg-gradient-to-br ${cardGradient} p-4 space-y-3 hover:shadow-lg hover:scale-[1.02] transition-all duration-200`}>
-											<div className="flex items-start justify-between">
-												<Link href={`/domain/${domain.id}`} className="flex items-center gap-3 cursor-pointer min-w-0 flex-1">
-													{domain.favicon_url && (
-														<img
-															src={domain.favicon_url}
-															alt=""
-															className="h-8 w-8 shrink-0 rounded-lg bg-background p-1"
-															onError={(e) => (e.currentTarget.style.display = "none")}
-														/>
-													)}
-													<div className="min-w-0 flex-1">
-														<div className="font-semibold text-base truncate hover:underline">{domain.domain_name}</div>
-														{displayOptions.showRegistrar && (
-															<div className="text-xs text-muted-foreground truncate mt-0.5">{domain.registrar_name || "Unknown"}</div>
-														)}
-													</div>
-												</Link>
-												<DropdownMenu>
-													<DropdownMenuTrigger asChild>
-														<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-															<MoreHorizontal className="h-4 w-4" />
-														</Button>
-													</DropdownMenuTrigger>
-													<DropdownMenuContent align="end">
-														<DropdownMenuItem onClick={() => handleEdit(domain)}>Edit</DropdownMenuItem>
-														<DropdownMenuItem onClick={() => handleRefresh(domain.id)} disabled={refreshMutation.isPending}>
-															<RefreshCw className="mr-2 h-4 w-4" />
-															Refresh
-														</DropdownMenuItem>
-														<DropdownMenuItem onClick={() => handleDelete(domain.id)} className="text-destructive">
-															Delete
-														</DropdownMenuItem>
-													</DropdownMenuContent>
-												</DropdownMenu>
-											</div>
-
-											<div className="flex items-center gap-2">
-												{getStatusIcon(domain.status)}
-												<Badge className={getStatusBadgeColor(domain.status)}>
-													{getStatusLabel(domain.status)}
-												</Badge>
-											</div>
-
-											{displayOptions.showTags && domain.tags && domain.tags.length > 0 && (
-												<div className="flex flex-wrap gap-1">
-													{domain.tags.map((tag: string) => (
-														<span
-															key={tag}
-															className="inline-flex items-center gap-1 rounded-md bg-background/50 border px-2 py-0.5 text-[10px] font-medium"
-														>
-															<Tag className="h-3 w-3" />
-															{tag}
-														</span>
-													))}
-												</div>
-											)}
-
-											<div className="space-y-3">
-												{displayOptions.showExpiryDate && (
-													<div className="flex items-center justify-between text-sm">
-														<span className="text-xs text-muted-foreground">Expiry</span>
-														<span className="font-medium">{domain.expiry_date ? formatDate(domain.expiry_date) : "Unknown"}</span>
-													</div>
+								{filteredDomains.map((domain) => (
+									<div key={domain.id} className="rounded-lg border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
+										<div className="flex items-start justify-between">
+											<Link href={`/domain/${domain.id}`} className="flex items-center gap-3 cursor-pointer min-w-0">
+												{domain.favicon_url && (
+													<img
+														src={domain.favicon_url}
+														alt=""
+														className="h-5 w-5 shrink-0"
+														onError={(e) => (e.currentTarget.style.display = "none")}
+													/>
 												)}
-												<div className="flex items-center justify-between gap-2">
-													<DaysLeftBadge days={domain.days_until_expiry} />
-													{displayOptions.showSSL && domain.ssl_valid_to && (
-														<DaysLeftBadge days={domain.ssl_days_until} label="ssl" />
-													)}
-													<Button
-														onClick={() => handleRefresh(domain.id)}
-														disabled={refreshMutation.isPending}
-														variant="outline"
-														size="sm"
-														className="h-8 px-2"
-													>
-														<RefreshCw className={`h-4 w-4 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
-													</Button>
+												<div className="min-w-0">
+													<div className="font-medium truncate hover:underline">{domain.domain_name}</div>
 												</div>
+											</Link>
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+														<MoreHorizontal className="h-4 w-4" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem onClick={() => handleEdit(domain)}>Edit</DropdownMenuItem>
+													<DropdownMenuItem onClick={() => handleRefresh(domain.id)} disabled={refreshMutation.isPending}>
+														<RefreshCw className="mr-2 h-4 w-4" />
+														Refresh
+													</DropdownMenuItem>
+													<DropdownMenuItem onClick={() => handleDelete(domain.id)} className="text-destructive">
+														Delete
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										</div>
+
+										<div className="flex items-center gap-2">
+											{getStatusIcon(domain.status)}
+											<Badge className={getStatusBadgeColor(domain.status)}>
+												{getStatusLabel(domain.status)}
+											</Badge>
+										</div>
+
+										{displayOptions.showTags && domain.tags && domain.tags.length > 0 && (
+											<div className="flex flex-wrap gap-1">
+												{domain.tags.map((tag: string) => (
+													<span
+														key={tag}
+														className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium"
+													>
+														<Tag className="h-3 w-3" />
+														{tag}
+													</span>
+												))}
+											</div>
+										)}
+
+										<div className="grid gap-2 text-sm">
+											<div className="flex items-center justify-between">
+												{displayOptions.showExpiryDate && (
+													<span className="text-xs text-muted-foreground">{domain.expiry_date ? formatDate(domain.expiry_date) : "Unknown"}</span>
+												)}
+												{displayOptions.showRegistrar && (
+													<span className="text-xs text-muted-foreground truncate max-w-[120px]">{domain.registrar_name || "Unknown"}</span>
+												)}
+											</div>
+											<div className="flex gap-2">
+												<DaysLeftBadge days={domain.days_until_expiry} />
+												{displayOptions.showSSL && domain.ssl_valid_to && (
+													<DaysLeftBadge days={domain.ssl_days_until} label="ssl" />
+												)}
 											</div>
 										</div>
-									)
-								})}
+									</div>
+								))}
 							</div>
 						)}
 					</CardContent>

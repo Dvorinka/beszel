@@ -70,8 +70,9 @@ import {
 } from "@/lib/monitors"
 import { cn, useBrowserStorage } from "@/lib/utils"
 import { AddMonitorDialog } from "./add-monitor-dialog"
+import { GroupedMonitorsTable } from "./grouped-monitors-table"
 import { Link } from "@/components/router"
-import ContainersTable from "../containers-table/containers-table"
+import { Network } from "lucide-react"
 
 // Status indicator component
 function StatusIndicator({ status }: { status: MonitorStatus }) {
@@ -186,7 +187,7 @@ function MonitorCard({
 						{getMonitorTypeLabel(monitor.type)}
 					</div>
 				</div>
-
+				
 				{/* Uptime - Prominent pill display */}
 				<div className="flex flex-col gap-2">
 					<div className="flex items-center gap-2 flex-wrap">
@@ -197,7 +198,7 @@ function MonitorCard({
 					</div>
 					<UptimeDots heartbeats={monitor.recent_heartbeats} />
 				</div>
-
+				
 				<div className="flex items-center justify-between text-sm">
 					<div className="text-xs text-muted-foreground">Response</div>
 					<div>
@@ -223,11 +224,6 @@ function MonitorCard({
 					))}
 				</div>
 			)}
-
-			{/* Containers Section */}
-			<div className="pt-3 border-t">
-				<ContainersTable />
-			</div>
 
 			<div className="flex items-center gap-2 pt-2 border-t">
 				<TooltipProvider>
@@ -283,18 +279,18 @@ function MonitorCard({
 
 // Uptime pill badge component - big and visible
 function UptimePill({ uptime, label = "24h" }: { uptime: number; label?: string }) {
-	let colorClass = "bg-green-500 text-white border-green-500"
+	let colorClass = "bg-green-500/15 text-green-600 border-green-500/30"
 	let icon = <CheckCircleIcon className="h-3.5 w-3.5" />
-
+	
 	if (uptime < 99.9) {
-		colorClass = "bg-green-500 text-white border-green-500"
+		colorClass = "bg-green-500/15 text-green-600 border-green-500/30"
 	}
 	if (uptime < 95) {
-		colorClass = "bg-yellow-500 text-white border-yellow-500"
+		colorClass = "bg-yellow-500/15 text-yellow-600 border-yellow-500/30"
 		icon = <AlertTriangle className="h-3.5 w-3.5" />
 	}
 	if (uptime < 90) {
-		colorClass = "bg-red-500 text-white border-red-500"
+		colorClass = "bg-red-500/15 text-red-600 border-red-500/30"
 		icon = <XCircle className="h-3.5 w-3.5" />
 	}
 
@@ -302,7 +298,7 @@ function UptimePill({ uptime, label = "24h" }: { uptime: number; label?: string 
 		<div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 ${colorClass}`}>
 			{icon}
 			<span className="text-sm font-bold">{formatUptime(uptime)}</span>
-			<span className="text-[10px] font-medium uppercase opacity-90">{label}</span>
+			<span className="text-[10px] font-medium uppercase opacity-70">{label}</span>
 		</div>
 	)
 }
@@ -312,6 +308,10 @@ function UptimeBar({ stats }: { stats?: Record<string, number> }) {
 	const uptime24h = stats?.uptime_24h ?? 100
 	const uptime7d = stats?.uptime_7d ?? 100
 	const uptime30d = stats?.uptime_30d ?? 100
+
+	let color = "bg-green-500"
+	if (uptime24h < 95) color = "bg-yellow-500"
+	if (uptime24h < 90) color = "bg-red-500"
 
 	return (
 		<div className="flex flex-col gap-1.5">
@@ -532,7 +532,7 @@ function MonitorRow({
 	)
 }
 
-type ViewMode = "table" | "grid"
+type ViewMode = "table" | "grid" | "network"
 type StatusFilter = "all" | MonitorStatus
 type TypeFilter = "all" | MonitorType
 
@@ -745,6 +745,10 @@ export default memo(function MonitorsTable() {
 										<LayoutGridIcon className="size-4" />
 										<Trans>Grid</Trans>
 									</DropdownMenuRadioItem>
+									<DropdownMenuRadioItem value="network" className="gap-2">
+										<Network className="size-4" />
+										<Trans>Network (Grouped)</Trans>
+									</DropdownMenuRadioItem>
 								</DropdownMenuRadioGroup>
 								<DropdownMenuSeparator />
 
@@ -803,6 +807,8 @@ export default memo(function MonitorsTable() {
 							</div>
 						)}
 					</div>
+				) : viewMode === "network" ? (
+					<GroupedMonitorsTable />
 				) : viewMode === "table" ? (
 					<Table>
 						<TableHeader>
