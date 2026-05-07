@@ -51,6 +51,7 @@ import { $router, Link } from "../router"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { SystemsTableColumns, ActionsButton, IndicatorDot } from "./systems-table-columns"
 import { AddSystemDialog } from "../add-system"
+import ContainersTable from "../containers-table/containers-table"
 
 type ViewMode = "table" | "grid"
 type StatusFilter = "all" | SystemRecord["status"]
@@ -511,6 +512,9 @@ const SystemCard = memo(
 									</>
 								)
 							})}
+						</div>
+						<div className="mt-4 pt-4 border-t border-border/60">
+							<ContainersTable systemId={system.id} />
 						</div>
 					</CardContent>
 					<Link
