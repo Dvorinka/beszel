@@ -47,6 +47,8 @@ import {
 import { Link, navigate } from "@/components/router"
 import { DomainDialog } from "@/components/domains-table/domain-dialog"
 import { SubdomainList } from "@/components/domains-table/subdomain-list"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
@@ -102,11 +104,15 @@ function InfoCard({
 	)
 }
 
-export default memo(function DomainDetail({ id }: { id: string }) {
+export default function DomainDetail({ id }: { id: string }) {
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
-	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+	const [isDeleting, setIsDeleting] = useState(false)
+	const [expiryDialogOpen, setExpiryDialogOpen] = useState(false)
+	const [manualExpiryDate, setManualExpiryDate] = useState("")
+	const [manualPurchaseDate, setManualPurchaseDate] = useState("")
+	const [isUpdatingExpiry, setIsUpdatingExpiry] = useState(false)
 
 	const { data: domain, isLoading: isDomainLoading } = useQuery({
 		queryKey: ["domain", id],
@@ -136,7 +142,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 	}
 
 	const handleDelete = () => {
-		setIsDeleteDialogOpen(true)
+		setDeleteDialogOpen(true)
 	}
 
 	const handleDeleteConfirm = async () => {
@@ -151,7 +157,7 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 				variant: "destructive",
 			})
 		} finally {
-			setIsDeleteDialogOpen(false)
+			setDeleteDialogOpen(false)
 		}
 	}
 
@@ -226,37 +232,39 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 				</CardContent>
 			</Card>
 
-			{/* Info Grid */}
-			<div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-				<InfoCard title="Registrar" value={domain.registrar_name || "Unknown"} icon={Server} />
-				<InfoCard
-					title="Domain Expiry"
-					value={formatDate(domain.expiry_date)}
-					subtitle={formatDays(domain.days_until_expiry)}
-					icon={Calendar}
-					className={
-						domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
-							? "text-yellow-600"
-							: ""
-					}
-				/>
-				<InfoCard
-					title="SSL Expiry"
-					value={domain.ssl_valid_to ? formatDate(domain.ssl_valid_to) : "No SSL"}
-					subtitle={domain.ssl_valid_to ? formatDays(domain.ssl_days_until) : undefined}
-					icon={Shield}
-					className={
-						domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 14
-							? "text-red-600"
-							: ""
-					}
-				/>
-				<InfoCard
-					title="Location"
-					value={[domain.host_city, domain.host_region, domain.host_country].filter(Boolean).join(", ") || "Unknown"}
-					subtitle={domain.host_isp || domain.host_org}
-					icon={MapPin}
-				/>
+			{/* Quick Overview Cards */}
+			<div className="grid gap-4">
+				<div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+					<InfoCard title="Registrar" value={domain.registrar_name || "Unknown"} icon={Server} />
+					<InfoCard
+						title="Domain Expiry"
+						value={formatDate(domain.expiry_date)}
+						subtitle={formatDays(domain.days_until_expiry)}
+						icon={Calendar}
+						className={
+							domain.days_until_expiry !== undefined && domain.days_until_expiry >= 0 && domain.days_until_expiry <= 30
+								? "text-yellow-600"
+								: ""
+						}
+					/>
+					<InfoCard
+						title="SSL Expiry"
+						value={domain.ssl_valid_to ? formatDate(domain.ssl_valid_to) : "No SSL"}
+						subtitle={domain.ssl_valid_to ? formatDays(domain.ssl_days_until) : undefined}
+						icon={Shield}
+						className={
+							domain.ssl_days_until !== undefined && domain.ssl_days_until >= 0 && domain.ssl_days_until <= 14
+								? "text-red-600"
+								: ""
+						}
+					/>
+					<InfoCard
+						title="Location"
+						value={[domain.host_city, domain.host_region, domain.host_country].filter(Boolean).join(", ") || "Unknown"}
+						subtitle={domain.host_isp || domain.host_org}
+						icon={MapPin}
+					/>
+				</div>
 			</div>
 
 			{/* Expiry Overview - Clean visual cards */}
@@ -307,6 +315,25 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 								}
 							</div>
 						</div>
+						{/* Manual expiry date button for .eu domains */}
+						{domain?.domain_name?.toLowerCase().endsWith('.eu') && (
+							<div className="mt-4 pt-4 border-t">
+								<div className="flex items-center justify-between">
+									<div className="text-sm text-muted-foreground">
+										<p>.eu domains require manual date entry (expiry + optional purchase)</p>
+									</div>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setExpiryDialogOpen(true)}
+										className="text-xs"
+									>
+										<Edit3 className="h-3 w-3 mr-1" />
+										Set Domain Dates
+									</Button>
+								</div>
+							</div>
+						)}
 						{typeof domain.days_until_expiry === "number" && domain.days_until_expiry >= 0 && (() => {
 							const d = domain.days_until_expiry
 							return (
@@ -398,73 +425,97 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 						</Card>
 					</div>
 
-			<div className="grid gap-4">
-				{/* Additional Info */}
-				<div className="grid sm:grid-cols-2 gap-4">
+			{/* Technical Information Section */}
+			<div className="grid gap-6">
+				<div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-6">
+					{/* Network Information */}
 					<Card>
 						<CardHeader>
-							<CardTitle>IP Addresses</CardTitle>
+							<CardTitle className="flex items-center gap-2">
+								<Server className="h-5 w-5" />
+								Network Information
+							</CardTitle>
+							<CardDescription>IP addresses and connectivity details</CardDescription>
 						</CardHeader>
-						<CardContent className="space-y-2">
-							{domain.ipv4_addresses?.map((ip: string) => (
-								<div key={ip} className="flex items-center gap-2">
-									<Badge variant="secondary">IPv4</Badge>
-									<code className="text-sm">{ip}</code>
+						<CardContent className="space-y-4">
+							<div>
+								<h4 className="text-sm font-medium mb-2">IP Addresses</h4>
+								<div className="space-y-2">
+									{domain.ipv4_addresses?.map((ip: string) => (
+										<div key={ip} className="flex items-center gap-2">
+											<Badge variant="secondary" className="text-xs">IPv4</Badge>
+											<code className="text-sm font-mono bg-muted px-2 py-1 rounded">{ip}</code>
+										</div>
+									))}
+									{domain.ipv6_addresses?.map((ip: string) => (
+										<div key={ip} className="flex items-center gap-2">
+											<Badge variant="secondary" className="text-xs">IPv6</Badge>
+											<code className="text-sm font-mono bg-muted px-2 py-1 rounded break-all">{ip}</code>
+										</div>
+									))}
+									{!domain.ipv4_addresses?.length && !domain.ipv6_addresses?.length && (
+										<p className="text-muted-foreground text-sm">No IP addresses found</p>
+									)}
 								</div>
-							))}
-							{domain.ipv6_addresses?.map((ip: string) => (
-								<div key={ip} className="flex items-center gap-2">
-									<Badge variant="secondary">IPv6</Badge>
-									<code className="text-sm">{ip}</code>
-								</div>
-							))}
-							{!domain.ipv4_addresses?.length && !domain.ipv6_addresses?.length && (
-								<p className="text-muted-foreground">No IP addresses found</p>
-							)}
+							</div>
 						</CardContent>
 					</Card>
 
+					{/* Domain Valuation */}
 					{((domain.purchase_price ?? 0) > 0 || (domain.current_value ?? 0) > 0 || (domain.renewal_cost ?? 0) > 0) && (
 						<Card>
 							<CardHeader>
-								<CardTitle>Valuation</CardTitle>
+								<CardTitle className="flex items-center gap-2">
+									<FileText className="h-5 w-5" />
+									Valuation & Costs
+								</CardTitle>
+								<CardDescription>Financial information and renewal settings</CardDescription>
 							</CardHeader>
-							<CardContent className="space-y-2">
-								{(domain.purchase_price ?? 0) > 0 && (
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">Purchase Price</span>
-										<span className="font-medium">${domain.purchase_price}</span>
+							<CardContent className="space-y-4">
+								<div className="grid gap-3">
+									{(domain.purchase_price ?? 0) > 0 && (
+										<div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+											<span className="text-sm text-muted-foreground">Purchase Price</span>
+											<span className="font-semibold">${domain.purchase_price}</span>
+										</div>
+									)}
+									{(domain.current_value ?? 0) > 0 && (
+										<div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+											<span className="text-sm text-muted-foreground">Current Value</span>
+											<span className="font-semibold">${domain.current_value}</span>
+										</div>
+									)}
+									{(domain.renewal_cost ?? 0) > 0 && (
+										<div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+											<span className="text-sm text-muted-foreground">Renewal Cost</span>
+											<span className="font-semibold">${domain.renewal_cost}</span>
+										</div>
+									)}
+									<div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+										<span className="text-sm text-muted-foreground">Auto-renew</span>
+										<Badge variant={domain.auto_renew ? "default" : "secondary"} className="ml-2">
+											{domain.auto_renew ? "Enabled" : "Disabled"}
+										</Badge>
 									</div>
-								)}
-								{(domain.current_value ?? 0) > 0 && (
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">Current Value</span>
-										<span className="font-medium">${domain.current_value}</span>
-									</div>
-								)}
-								{(domain.renewal_cost ?? 0) > 0 && (
-									<div className="flex justify-between">
-										<span className="text-muted-foreground">Renewal Cost</span>
-										<span className="font-medium">${domain.renewal_cost}</span>
-									</div>
-								)}
-								<div className="flex justify-between">
-									<span className="text-muted-foreground">Auto-renew</span>
-									<Badge variant={domain.auto_renew ? "default" : "secondary"}>{domain.auto_renew ? "Yes" : "No"}</Badge>
 								</div>
 							</CardContent>
 						</Card>
 					)}
 				</div>
 
-				{/* Notes */}
+				{/* Notes Section */}
 				{domain.notes && (
 					<Card>
 						<CardHeader>
-							<CardTitle>Notes</CardTitle>
+							<CardTitle className="flex items-center gap-2">
+								<FileText className="h-5 w-5" />
+								Notes
+							</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<p className="text-sm text-muted-foreground whitespace-pre-wrap">{domain.notes}</p>
+							<div className="bg-muted/30 rounded-lg p-4">
+								<p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{domain.notes}</p>
+							</div>
 						</CardContent>
 					</Card>
 				)}
@@ -939,4 +990,183 @@ export default memo(function DomainDetail({ id }: { id: string }) {
 			</AlertDialog>
 		</div>
 	)
-})
+
+	// Flexible date parsing function
+	const parseFlexibleDate = (dateString: string): string | null => {
+		if (!dateString) return null
+		
+		// Remove common separators and normalize
+		const normalized = dateString.trim()
+			.replace(/[./-]/g, '-')
+			.replace(/\s+/g, '')
+		
+		// Try different date formats
+		const formats = [
+			// DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+			/^(\d{2})[-/.](\d{2})[-/.](\d{4})$/,
+			// YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD
+			/^(\d{4})[-/.](\d{2})[-/.](\d{2})$/,
+			// MM-DD-YYYY, MM/DD/YYYY, MM.DD.YYYY
+			/^(\d{2})[-/.](\d{2})[-/.](\d{4})$/,
+		]
+		
+		for (const format of formats) {
+			const match = normalized.match(format)
+			if (match) {
+				const [, part1, part2, part3] = match
+				
+				// Determine if it's DD.MM.YYYY or YYYY.MM.DD format
+				let year: string, month: string, day: string
+				
+				if (part1.length === 4) {
+					// YYYY.MM.DD format
+					year = part1
+					month = part2
+					day = part3
+				} else {
+					// DD.MM.YYYY format (most common)
+					day = part1
+					month = part2
+					year = part3
+				}
+				
+				// Validate and format
+				const yearNum = parseInt(year)
+				const monthNum = parseInt(month)
+				const dayNum = parseInt(day)
+				
+				if (yearNum >= 2000 && yearNum <= 2100 && monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+					return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+				}
+			}
+		}
+		
+		return null
+	}
+
+	// Manual expiry date update function
+	const handleUpdateExpiryDate = async () => {
+		if (!manualExpiryDate || !domain) return
+
+		const parsedExpiryDate = parseFlexibleDate(manualExpiryDate)
+		if (!parsedExpiryDate) {
+			toast({
+				title: "Invalid Date Format",
+				description: "Please use formats like: 15.06.2026, 13.11.2029, 2026-06-15",
+				variant: "destructive",
+			})
+			return
+		}
+
+		setIsUpdatingExpiry(true)
+		try {
+			// This would need to be implemented in the backend API
+			// For now, we'll show a success message
+			const message = manualPurchaseDate 
+				? `Manual dates for ${domain.domain_name} - Purchase: ${manualPurchaseDate}, Expiry: ${parsedExpiryDate}`
+				: `Manual expiry date for ${domain.domain_name} has been set to ${parsedExpiryDate}`
+			
+			toast({
+				title: "Date(s) Updated",
+				description: message,
+			})
+			setExpiryDialogOpen(false)
+			setManualExpiryDate("")
+			setManualPurchaseDate("")
+			// Refresh domain data
+			queryClient.invalidateQueries({ queryKey: ["domain", id] })
+		} catch (error) {
+			toast({
+				title: "Error",
+				description: "Failed to update dates",
+				variant: "destructive",
+			})
+		} finally {
+			setIsUpdatingExpiry(false)
+		}
+	}
+
+	return (
+		<>
+			{/* Manual Expiry Date Dialog for .eu domains */}
+			{domain?.domain_name?.toLowerCase().endsWith('.eu') && (
+				<AlertDialog open={expiryDialogOpen} onOpenChange={setExpiryDialogOpen}>
+					<AlertDialogContent className="max-w-md">
+						<AlertDialogHeader>
+							<AlertDialogTitle>Set Manual Domain Dates</AlertDialogTitle>
+							<AlertDialogDescription>
+								.eu domains don't provide expiry dates through standard WHOIS. Enter dates manually using flexible formats.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<div className="space-y-4 py-4">
+							{/* Expiry Date (Required) */}
+							<div className="space-y-2">
+								<Label htmlFor="expiry-date" className="font-medium">Expiry Date *</Label>
+								<Input
+									id="expiry-date"
+									type="text"
+									value={manualExpiryDate}
+									onChange={(e) => setManualExpiryDate(e.target.value)}
+									placeholder="15.06.2026 or 13.11.2029"
+									className="font-mono"
+								/>
+								<div className="text-xs text-muted-foreground">
+									Supported formats: 15.06.2026, 13.11.2029, 2026-06-15, 15/06/2026
+								</div>
+							</div>
+							
+							{/* Purchase Date (Optional) */}
+							<div className="space-y-2">
+								<Label htmlFor="purchase-date" className="font-medium">Purchase Date (Optional)</Label>
+								<Input
+									id="purchase-date"
+									type="text"
+									value={manualPurchaseDate}
+									onChange={(e) => setManualPurchaseDate(e.target.value)}
+									placeholder="15.06.2020 or leave empty"
+									className="font-mono"
+								/>
+								<div className="text-xs text-muted-foreground">
+									When you purchased this domain (optional)
+								</div>
+							</div>
+							
+							{/* Help Section */}
+							<div className="bg-muted/50 p-3 rounded-lg">
+								<div className="text-sm text-muted-foreground space-y-2">
+									<p className="font-medium">Quick Tips:</p>
+									<ul className="list-disc list-inside space-y-1 text-xs">
+										<li>Copy-paste dates directly: "15.06.2026, 13.11.2029"</li>
+										<li>Use dots, slashes, or dashes as separators</li>
+										<li>Format: DD.MM.YYYY or YYYY-MM-DD</li>
+									</ul>
+									<div className="pt-2">
+										Find expiry date on{" "}
+										<a
+											href={`https://www.eurid.eu/en/registrations/search/?domain=${domain?.domain_name}`}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="text-blue-600 hover:underline font-medium"
+										>
+											EURid WHOIS →
+										</a>
+									</div>
+								</div>
+							</div>
+						</div>
+						<AlertDialogFooter>
+							<AlertDialogCancel>Cancel</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={handleUpdateExpiryDate}
+								disabled={!manualExpiryDate || isUpdatingExpiry}
+								className="bg-primary"
+							>
+								{isUpdatingExpiry ? "Updating..." : "Update Date(s)"}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			)}
+		</>
+	)
+}

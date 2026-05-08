@@ -293,8 +293,12 @@ func (h *APIHandler) createMonitor(e *core.RequestEvent) error {
 	h.scheduler.AddMonitor(record)
 
 	// Run initial check synchronously so the monitor shows real status immediately
-	if _, err := h.scheduler.RunManualCheck(record.Id); err != nil {
+	result, err := h.scheduler.RunManualCheck(record.Id)
+	if err != nil {
 		log.Printf("[monitor-api] Initial check failed for %s: %v", record.Id, err)
+		// Note: The monitor will remain in pending status and the scheduler will retry
+	} else {
+		log.Printf("[monitor-api] Initial check completed for %s: status=%s, ping=%v", record.Id, result.Status, result.Ping)
 	}
 
 	// Re-fetch the updated record to get the new status

@@ -41,16 +41,15 @@ import {
 	DropdownMenuTrigger,
 	DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
 	getDomains,
 	deleteDomain,
 	refreshDomain,
-	getStatusBadgeColor,
-	getStatusLabel,
+	getDomainSubdomains,
 	formatDate,
 	type Domain,
+	type Subdomain,
 } from "@/lib/domains"
 import {
 	MoreHorizontal,
@@ -67,7 +66,7 @@ import {
 } from "lucide-react"
 import { DomainDialog } from "./domain-dialog"
 import { Link } from "@/components/router"
-import { useBrowserStorage } from "@/lib/utils"
+import { cn, useBrowserStorage } from "@/lib/utils"
 
 type ViewMode = "table" | "grid"
 type StatusFilter = "all" | "active" | "expiring" | "expired" | "unknown" | "paused"
@@ -99,6 +98,41 @@ function DaysLeftBadge({ days, label = "days" }: { days: number | undefined; lab
 		<div className={`inline-flex flex-col items-center justify-center px-3 py-1.5 rounded-lg border-2 ${colorClass} min-w-[70px]`}>
 			<span className="text-lg font-bold leading-none">{isExpired ? Math.abs(days) : days}</span>
 			<span className="text-[10px] font-medium uppercase tracking-wide opacity-80">{isExpired ? "EXPIRED" : days === 1 ? "DAY" : label.toUpperCase()}</span>
+		</div>
+	)
+}
+
+// Subdomain indicator component
+function SubdomainIndicator({ domainId }: { domainId: string }) {
+	const { data: subdomains, isLoading } = useQuery({
+		queryKey: ["domain-subdomains", domainId],
+		queryFn: () => getDomainSubdomains(domainId),
+		enabled: !!domainId,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+	})
+
+	if (isLoading || !subdomains || subdomains.length === 0) {
+		return null
+	}
+
+	const activeCount = subdomains.filter(s => s.status === "active").length
+	const totalCount = subdomains.length
+	const hasIssues = subdomains.some(s => s.status === "error")
+
+	return (
+		<div className="flex items-center gap-1">
+			<div className={cn(
+				"inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border",
+				hasIssues 
+					? "bg-orange-500/15 text-orange-600 border-orange-500/30"
+					: "bg-blue-500/15 text-blue-600 border-blue-500/30"
+			)}>
+				<Globe className="h-3 w-3" />
+				<span>{activeCount}/{totalCount}</span>
+			</div>
+			{hasIssues && (
+				<AlertTriangle className="h-3 w-3 text-orange-500" />
+			)}
 		</div>
 	)
 }
@@ -203,18 +237,34 @@ export default function DomainsTable() {
 		refreshMutation.mutate(id)
 	}
 
-	const getStatusIcon = (status: string) => {
-		switch (status) {
-			case "active":
-				return <CheckCircle2 className="h-4 w-4 text-green-500" />
-			case "expiring":
-				return <Clock className="h-4 w-4 text-yellow-500" />
-			case "expired":
-				return <AlertTriangle className="h-4 w-4 text-red-500" />
-			default:
-				return <Globe className="h-4 w-4 text-gray-500" />
-		}
+	// Status indicator component matching monitors table style
+function StatusIndicator({ status }: { status: string }) {
+	const colors = {
+		active: "bg-green-500",
+		expiring: "bg-yellow-500",
+		expired: "bg-red-500",
+		unknown: "bg-gray-500",
+		paused: "bg-blue-500",
 	}
+
+	const icons = {
+		active: CheckCircle2,
+		expiring: Clock,
+		expired: AlertTriangle,
+		unknown: AlertTriangle,
+		paused: Clock,
+	}
+
+	const Icon = icons[status as keyof typeof icons] || AlertTriangle
+
+	return (
+		<div className="flex items-center gap-2">
+			<div className={cn("h-2.5 w-2.5 rounded-full", colors[status as keyof typeof colors] || "bg-gray-500")} />
+			<Icon className="h-4 w-4 text-muted-foreground" />
+			<span className="capitalize text-sm">{status === "active" ? "Active" : status === "expiring" ? "Expiring Soon" : status === "expired" ? "Expired" : status}</span>
+		</div>
+	)
+}
 
 	if (isLoading) {
 		return (
@@ -458,20 +508,16 @@ export default function DomainsTable() {
 															<img
 																src={domain.favicon_url}
 																alt=""
-																className="h-4 w-4"
+																className="h-4 w-4 rounded-sm"
 																onError={(e) => (e.currentTarget.style.display = "none")}
 															/>
 														)}
 														<span className="hover:underline">{domain.domain_name}</span>
+														<SubdomainIndicator domainId={domain.id} />
 													</Link>
 												</TableCell>
 												<TableCell>
-													<div className="flex items-center gap-2">
-														{getStatusIcon(domain.status)}
-														<Badge className={getStatusBadgeColor(domain.status)}>
-															{getStatusLabel(domain.status)}
-														</Badge>
-													</div>
+													<StatusIndicator status={domain.status} />
 												</TableCell>
 												{displayOptions.showExpiryDate && (
 													<TableCell>
@@ -566,6 +612,7 @@ export default function DomainsTable() {
 												)}
 												<div className="min-w-0">
 													<div className="font-medium truncate hover:underline">{domain.domain_name}</div>
+													<SubdomainIndicator domainId={domain.id} />
 												</div>
 											</Link>
 											<DropdownMenu>
@@ -587,12 +634,7 @@ export default function DomainsTable() {
 											</DropdownMenu>
 										</div>
 
-										<div className="flex items-center gap-2">
-											{getStatusIcon(domain.status)}
-											<Badge className={getStatusBadgeColor(domain.status)}>
-												{getStatusLabel(domain.status)}
-											</Badge>
-										</div>
+										<StatusIndicator status={domain.status} />
 
 										{displayOptions.showTags && domain.tags && domain.tags.length > 0 && (
 											<div className="flex flex-wrap gap-1">

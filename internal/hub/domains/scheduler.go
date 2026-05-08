@@ -151,13 +151,13 @@ func (s *Scheduler) checkDomain(record *core.Record) error {
 	oldRecord := record.Fresh()
 
 	// Update record (only overwrite if new data is present to preserve valid data on partial lookups)
-	if newData.ExpiryDate != nil {
+	if newData.ExpiryDate != nil && newData.ExpiryDate.After(time.Time{}) {
 		record.Set("expiry_date", *newData.ExpiryDate)
 	}
-	if newData.CreationDate != nil {
+	if newData.CreationDate != nil && newData.CreationDate.After(time.Time{}) {
 		record.Set("creation_date", *newData.CreationDate)
 	}
-	if newData.UpdatedDate != nil {
+	if newData.UpdatedDate != nil && newData.UpdatedDate.After(time.Time{}) {
 		record.Set("updated_date", *newData.UpdatedDate)
 	}
 	if newData.RegistrarName != "" {

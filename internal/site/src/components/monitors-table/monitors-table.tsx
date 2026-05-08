@@ -70,9 +70,7 @@ import {
 } from "@/lib/monitors"
 import { cn, useBrowserStorage } from "@/lib/utils"
 import { AddMonitorDialog } from "./add-monitor-dialog"
-import { GroupedMonitorsTable } from "./grouped-monitors-table"
 import { Link } from "@/components/router"
-import { Network } from "lucide-react"
 
 // Status indicator component
 function StatusIndicator({ status }: { status: MonitorStatus }) {
@@ -532,7 +530,7 @@ function MonitorRow({
 	)
 }
 
-type ViewMode = "table" | "grid" | "network"
+type ViewMode = "table" | "grid"
 type StatusFilter = "all" | MonitorStatus
 type TypeFilter = "all" | MonitorType
 
@@ -745,10 +743,6 @@ export default memo(function MonitorsTable() {
 										<LayoutGridIcon className="size-4" />
 										<Trans>Grid</Trans>
 									</DropdownMenuRadioItem>
-									<DropdownMenuRadioItem value="network" className="gap-2">
-										<Network className="size-4" />
-										<Trans>Network (Grouped)</Trans>
-									</DropdownMenuRadioItem>
 								</DropdownMenuRadioGroup>
 								<DropdownMenuSeparator />
 
@@ -807,8 +801,6 @@ export default memo(function MonitorsTable() {
 							</div>
 						)}
 					</div>
-				) : viewMode === "network" ? (
-					<GroupedMonitorsTable />
 				) : viewMode === "table" ? (
 					<Table>
 						<TableHeader>

@@ -5,11 +5,25 @@ import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/components/router"
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, AlertCircle, Globe, Shield } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, AlertCircle, Globe, Shield, Filter, X } from "lucide-react"
 import { getCalendarEvents, type CalendarEvent } from "@/lib/incidents"
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export function CalendarView() {
 	const [currentDate, setCurrentDate] = useState(new Date())
+	const [eventFilters, setEventFilters] = useState({
+		domain_expiry: true,
+		ssl_expiry: true,
+		incident: true,
+	})
 	const year = currentDate.getFullYear()
 	const month = currentDate.getMonth()
 
@@ -46,20 +60,22 @@ export function CalendarView() {
 		// Days of month
 		for (let day = 1; day <= daysInMonth; day++) {
 			const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-			const dayEvents = events?.filter((e) => e.date === dateStr) || []
+			const dayEvents = events?.filter((e) => 
+				e.date === dateStr && eventFilters[e.type as keyof typeof eventFilters]
+			) || []
 			d.push({ day, events: dayEvents })
 		}
 
 		return d
-	}, [year, month, daysInMonth, firstDayOfMonth, events])
+	}, [year, month, daysInMonth, firstDayOfMonth, events, eventFilters])
 
 	const upcomingEvents = useMemo(() => {
 		const today = toDateString(new Date())
 		return (events || [])
-			.filter((event) => event.date >= today)
+			.filter((event) => event.date >= today && eventFilters[event.type as keyof typeof eventFilters])
 			.sort((a, b) => a.date.localeCompare(b.date))
 			.slice(0, 8)
-	}, [events])
+	}, [events, eventFilters])
 
 	const prevMonth = () => {
 		setCurrentDate(new Date(year, month - 1, 1))
@@ -123,26 +139,116 @@ export function CalendarView() {
 	return (
 		<Card className="w-full">
 			<CardHeader className="pb-4">
-				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-					<CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-						<div className="p-2 bg-primary/10 rounded-lg">
-							<CalendarIcon className="h-5 w-5 text-primary" />
+				<div className="flex flex-col gap-4">
+					{/* Title Row */}
+					<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+						<CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+							<div className="p-2 bg-primary/10 rounded-lg">
+								<CalendarIcon className="h-5 w-5 text-primary" />
+							</div>
+							<span>Calendar View</span>
+						</CardTitle>
+						<div className="flex items-center gap-2">
+							<Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8 text-xs">
+								Today
+							</Button>
+							<Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
+								<ChevronLeft className="h-4 w-4" />
+							</Button>
+							<span className="font-semibold min-w-[120px] sm:min-w-[160px] text-center text-sm sm:text-base px-2">
+								{monthNames[month]} {year}
+							</span>
+							<Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8">
+								<ChevronRight className="h-4 w-4" />
+							</Button>
 						</div>
-						<span>Calendar View</span>
-					</CardTitle>
-					<div className="flex items-center gap-2">
-						<Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8 text-xs">
-							Today
-						</Button>
-						<Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
-							<ChevronLeft className="h-4 w-4" />
-						</Button>
-						<span className="font-semibold min-w-[120px] sm:min-w-[160px] text-center text-sm sm:text-base px-2">
-							{monthNames[month]} {year}
-						</span>
-						<Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8">
-							<ChevronRight className="h-4 w-4" />
-						</Button>
+					</div>
+
+					{/* Filter Controls Row */}
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+						<div className="flex items-center gap-2">
+							<span className="text-sm font-medium text-muted-foreground">Show:</span>
+							<div className="flex flex-wrap gap-1">
+								<Button
+									variant={eventFilters.domain_expiry ? "default" : "outline"}
+									size="sm"
+									onClick={() => setEventFilters(prev => ({ ...prev, domain_expiry: !prev.domain_expiry }))}
+									className="h-7 text-xs gap-1"
+								>
+									<Globe className="h-3 w-3" />
+									Domain
+								</Button>
+								<Button
+									variant={eventFilters.ssl_expiry ? "default" : "outline"}
+									size="sm"
+									onClick={() => setEventFilters(prev => ({ ...prev, ssl_expiry: !prev.ssl_expiry }))}
+									className="h-7 text-xs gap-1"
+								>
+									<Shield className="h-3 w-3" />
+									SSL
+								</Button>
+								<Button
+									variant={eventFilters.incident ? "default" : "outline"}
+									size="sm"
+									onClick={() => setEventFilters(prev => ({ ...prev, incident: !prev.incident }))}
+									className="h-7 text-xs gap-1"
+								>
+									<AlertCircle className="h-3 w-3" />
+									Incidents
+								</Button>
+							</div>
+						</div>
+						<div className="flex items-center gap-2">
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button variant="ghost" size="sm" className="h-7 text-xs">
+										<Filter className="h-3 w-3 mr-1" />
+										Quick Filters
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end" className="w-48">
+									<DropdownMenuLabel>Event Types</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<DropdownMenuCheckboxItem
+										checked={eventFilters.domain_expiry}
+										onCheckedChange={(checked) => setEventFilters(prev => ({ ...prev, domain_expiry: checked }))}
+									>
+										<div className="flex items-center gap-2">
+											<Globe className="h-3 w-3" />
+											Domain Expiry
+										</div>
+									</DropdownMenuCheckboxItem>
+									<DropdownMenuCheckboxItem
+										checked={eventFilters.ssl_expiry}
+										onCheckedChange={(checked) => setEventFilters(prev => ({ ...prev, ssl_expiry: checked }))}
+									>
+										<div className="flex items-center gap-2">
+											<Shield className="h-3 w-3" />
+											SSL Expiry
+										</div>
+									</DropdownMenuCheckboxItem>
+									<DropdownMenuCheckboxItem
+										checked={eventFilters.incident}
+										onCheckedChange={(checked) => setEventFilters(prev => ({ ...prev, incident: checked }))}
+									>
+										<div className="flex items-center gap-2">
+											<AlertCircle className="h-3 w-3" />
+											Incidents
+										</div>
+									</DropdownMenuCheckboxItem>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onClick={() => setEventFilters({ domain_expiry: true, ssl_expiry: true, incident: true })}>
+										Show All
+									</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => setEventFilters({ domain_expiry: true, ssl_expiry: false, incident: false })}>
+										Domain Only
+									</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => setEventFilters({ domain_expiry: false, ssl_expiry: true, incident: false })}>
+										SSL Only
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						</div>
 					</div>
 				</div>
 			</CardHeader>

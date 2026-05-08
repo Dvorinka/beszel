@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os/exec"
@@ -79,32 +80,55 @@ func (s *LookupService) LookupDomain(ctx context.Context, domainName string) (*d
 func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, error) {
 	var lastErr error
 
-	// Try RDAP first (modern replacement for WHOIS)
+	// Try RDAP first
 	data, err := s.tryRDAP(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
 		return data, nil
 	}
-	lastErr = err
+	if err != nil {
+		lastErr = err
+	}
 
-	// Try pure-Go TCP WHOIS (works in containers without whois binary)
+	// Try TCP WHOIS (this should work for .eu domains)
 	data, err = s.tryTCPWHOIS(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
 		return data, nil
 	}
-	if lastErr == nil {
+	if err != nil {
 		lastErr = err
 	}
 
-	// Try native whois command
+	// Try native whois command (often works when TCP fails)
 	data, err = s.tryNativeWHOIS(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
 		return data, nil
 	}
-	if lastErr == nil {
+	if err != nil {
 		lastErr = err
 	}
 
-	// Try WhoisXML API if key is configured
+	// Try EURid web scraping for .eu domains to get expiry dates
+	parts := strings.Split(domainName, ".")
+	if len(parts) >= 2 && strings.ToLower(parts[len(parts)-1]) == "eu" {
+		data, err = s.tryEURidWebScraping(ctx, domainName)
+		if err == nil && data != nil && hasValidData(data) {
+			return data, nil
+		}
+		if err != nil {
+			lastErr = err
+		}
+
+		// Try alternative WHOIS services for .eu domains
+		data, err = s.tryAlternativeWHOIS(ctx, domainName)
+		if err == nil && data != nil && hasValidData(data) {
+			return data, nil
+		}
+		if err != nil {
+			lastErr = err
+		}
+	}
+
+	// Try WhoisXML API if key is configured (this can provide expiry dates for .eu domains)
 	if s.whoisXMLAPIKey != "" {
 		data, err = s.tryWhoisXML(ctx, domainName)
 		if err == nil && data != nil {
@@ -251,8 +275,15 @@ func (s *LookupService) tryNativeWHOIS(ctx context.Context, domainName string) (
 		return nil, fmt.Errorf("whois command not found")
 	}
 
+	// Use longer timeout for .eu domains
+	timeout := 10 * time.Second
+	parts := strings.Split(domainName, ".")
+	if len(parts) >= 2 && strings.ToLower(parts[len(parts)-1]) == "eu" {
+		timeout = 20 * time.Second
+	}
+
 	// Execute whois with timeout
-	cmdCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	cmdCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(cmdCtx, "whois", domainName)
@@ -312,7 +343,13 @@ func (s *LookupService) tryTCPWHOIS(ctx context.Context, domainName string) (*do
 
 	addr := net.JoinHostPort(server, "43")
 
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	// Use longer timeout for .eu domains as they can be slow
+	timeout := 10 * time.Second
+	if tld == "eu" {
+		timeout = 20 * time.Second
+	}
+
+	dialer := &net.Dialer{Timeout: timeout}
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("tcp whois dial failed: %w", err)
@@ -326,7 +363,7 @@ func (s *LookupService) tryTCPWHOIS(ctx context.Context, domainName string) (*do
 	}
 
 	// Read response with deadline
-	if err := conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 		return nil, err
 	}
 
@@ -414,10 +451,416 @@ func (s *LookupService) tryWhoisXML(ctx context.Context, domainName string) (*do
 	}, nil
 }
 
+// parseEUWHOIS parses .eu domain WHOIS output which has a unique format
+func (s *LookupService) parseEUWHOIS(output, domainName string) (*domain.WHOISData, error) {
+	lines := strings.Split(output, "\n")
+
+	var registrarName, organization string
+	var statuses []string
+
+	// Parse the .eu specific format
+	currentSection := ""
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Skip comments and empty lines
+		if line == "" || strings.HasPrefix(line, "%") {
+			continue
+		}
+
+		// Track sections
+		if strings.HasPrefix(line, "Registrant:") {
+			currentSection = "registrant"
+			continue
+		}
+		if strings.HasPrefix(line, "Technical:") {
+			currentSection = "technical"
+			continue
+		}
+		if strings.HasPrefix(line, "Registrar:") {
+			currentSection = "registrar"
+			continue
+		}
+		if strings.HasPrefix(line, "Name servers:") {
+			currentSection = "nameservers"
+			continue
+		}
+
+		// Parse based on current section
+		if idx := strings.Index(line, ":"); idx > 0 {
+			key := strings.TrimSpace(line[:idx])
+			value := strings.TrimSpace(line[idx+1:])
+
+			switch currentSection {
+			case "registrar":
+				if strings.TrimSpace(key) == "Name" {
+					registrarName = value
+				}
+				if strings.TrimSpace(key) == "Website" {
+					// Could extract website URL if needed
+				}
+			case "technical":
+				if strings.TrimSpace(key) == "Organisation" {
+					organization = value
+				}
+			}
+		}
+	}
+
+	// For .eu domains, we often don't get expiry dates, so we'll return what we have
+	return &domain.WHOISData{
+		DomainName: domainName,
+		Status:     statuses,
+		DNSSEC:     "", // .eu WHOIS doesn't provide DNSSEC info
+		Dates: domain.WHOISDates{
+			ExpiryDate:   nil, // .eu domains don't show expiry in TCP WHOIS
+			CreationDate: nil,
+			UpdatedDate:  nil,
+		},
+		Registrar: domain.WHOISRegistrar{
+			Name: registrarName,
+			ID:   "",
+			URL:  "",
+		},
+		Registrant: domain.WHOISContact{
+			Name:         "NOT DISCLOSED",
+			Organization: organization,
+		},
+	}, nil
+}
+
+// tryEURidWebScraping attempts to scrape EURid's web WHOIS for .eu domains
+func (s *LookupService) tryEURidWebScraping(ctx context.Context, domainName string) (*domain.WHOISData, error) {
+	// Try multiple EURid endpoints
+	endpoints := []string{
+		fmt.Sprintf("https://whois.eurid.eu/en/?q=%s", domainName),
+		fmt.Sprintf("https://whois.eurid.eu/en/search?q=%s", domainName),
+		fmt.Sprintf("https://www.eurid.eu/en/whois/?domain=%s", domainName),
+	}
+
+	for _, url := range endpoints {
+		data, err := s.tryEURidEndpoint(ctx, url, domainName)
+		if err == nil && data != nil {
+			return data, nil
+		}
+	}
+
+	return nil, fmt.Errorf("all EURid web scraping attempts failed for %s", domainName)
+}
+
+// tryEURidEndpoint attempts to scrape a specific EURid endpoint
+func (s *LookupService) tryEURidEndpoint(ctx context.Context, url, domainName string) (*domain.WHOISData, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Use more realistic browser headers
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("Sec-Ch-Ua", "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"")
+	req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+	req.Header.Set("Sec-Ch-Ua-Platform", "\"Windows\"")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+
+	client := &http.Client{Timeout: 20 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch EURid web page: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("EURid web page returned status %d", resp.StatusCode)
+	}
+
+	// Read the HTML response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read EURid response: %w", err)
+	}
+
+	// Parse the HTML to extract expiry date
+	return s.parseEURidWebHTML(string(body), domainName)
+}
+
+// tryAlternativeWHOIS tries alternative WHOIS services for .eu domains
+func (s *LookupService) tryAlternativeWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, error) {
+	// Try multiple alternative WHOIS services
+	services := []struct {
+		name string
+		url  string
+	}{
+		{"whois.com", fmt.Sprintf("https://www.whois.com/whois/%s", domainName)},
+		{"who.is", fmt.Sprintf("https://who.is/whois/%s", domainName)},
+		{"ip2location.com", fmt.Sprintf("https://www.ip2location.com/whois/%s", domainName)},
+	}
+
+	for _, service := range services {
+		data, err := s.tryAlternativeWHOISService(ctx, service.name, service.url, domainName)
+		if err == nil && data != nil {
+			return data, nil
+		}
+	}
+
+	return nil, fmt.Errorf("all alternative WHOIS services failed for %s", domainName)
+}
+
+// tryAlternativeWHOISService attempts to fetch WHOIS data from an alternative service
+func (s *LookupService) tryAlternativeWHOISService(ctx context.Context, serviceName, url, domainName string) (*domain.WHOISData, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request for %s: %w", serviceName, err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s: %w", serviceName, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("%s returned status %d", serviceName, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s response: %w", serviceName, err)
+	}
+
+	return s.parseAlternativeWHOISHTML(string(body), domainName, serviceName)
+}
+
+// parseAlternativeWHOISHTML parses HTML from alternative WHOIS services
+func (s *LookupService) parseAlternativeWHOISHTML(html, domainName, serviceName string) (*domain.WHOISData, error) {
+	var expiryDate, registrarName, status string
+
+	// Look for expiry date patterns (common across WHOIS services)
+	expiryPatterns := []string{
+		`Expiry Date:\s*</[^>]*>\s*([^<\n]+)`,
+		`Expiry Date:</[^>]*>\s*([^<\n]+)`,
+		`Expires on:\s*</[^>]*>\s*([^<\n]+)`,
+		`Expires:\s*</[^>]*>\s*([^<\n]+)`,
+		`"expiry":"([^"]+)"`,
+		`"expires":"([^"]+)"`,
+		`data-expiry="([^"]+)"`,
+		`\d{4}-\d{2}-\d{2}`, // ISO date pattern
+		`\d{2}/\d{2}/\d{4}`, // DD/MM/YYYY pattern
+	}
+
+	for _, pattern := range expiryPatterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(html)
+		if len(matches) > 1 {
+			expiryDate = strings.TrimSpace(matches[1])
+			break
+		}
+	}
+
+	// Look for registrar name
+	registrarPatterns := []string{
+		`Registrar:\s*</[^>]*>\s*([^<\n]+)`,
+		`Registrar:</[^>]*>\s*([^<\n]+)`,
+		`Registered through:\s*</[^>]*>\s*([^<\n]+)`,
+		`"registrar":"([^"]+)"`,
+		`data-registrar="([^"]+)"`,
+	}
+
+	for _, pattern := range registrarPatterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(html)
+		if len(matches) > 1 {
+			registrarName = strings.TrimSpace(matches[1])
+			break
+		}
+	}
+
+	// Look for status
+	statusPatterns := []string{
+		`Status:\s*</[^>]*>\s*([^<\n]+)`,
+		`Status:</[^>]*>\s*([^<\n]+)`,
+		`"status":"([^"]+)"`,
+		`data-status="([^"]+)"`,
+	}
+
+	for _, pattern := range statusPatterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(html)
+		if len(matches) > 1 {
+			status = strings.TrimSpace(matches[1])
+			break
+		}
+	}
+
+	// Parse expiry date if found
+	var parsedExpiry *time.Time
+	if expiryDate != "" {
+		// Try different date formats
+		dateFormats := []string{
+			"2006-01-02",           // ISO
+			"02/01/2006",           // DD/MM/YYYY
+			"01/02/2006",           // MM/DD/YYYY
+			"2006-01-02T15:04:05Z", // ISO with time
+		}
+
+		for _, format := range dateFormats {
+			if parsed, err := time.Parse(format, expiryDate); err == nil {
+				parsedExpiry = &parsed
+				break
+			}
+		}
+	}
+
+	// Create WHOIS data structure
+	var statuses []string
+	if status != "" {
+		statuses = []string{status}
+	}
+
+	return &domain.WHOISData{
+		DomainName: domainName,
+		Status:     statuses,
+		DNSSEC:     "",
+		Dates: domain.WHOISDates{
+			ExpiryDate:   parsedExpiry,
+			CreationDate: nil,
+			UpdatedDate:  nil,
+		},
+		Registrar: domain.WHOISRegistrar{
+			Name: registrarName,
+			ID:   "",
+			URL:  "",
+		},
+		Registrant: domain.WHOISContact{
+			Name:         "NOT DISCLOSED",
+			Organization: "",
+		},
+	}, nil
+}
+
+// parseEURidWebHTML parses EURid's web WHOIS HTML to extract domain information
+func (s *LookupService) parseEURidWebHTML(html, domainName string) (*domain.WHOISData, error) {
+	// This is a simplified HTML parser - in production, you'd want to use a proper HTML parser
+	// For now, we'll use regex to find key information
+
+	var expiryDate, registrarName, status string
+
+	// Look for expiry date patterns in EURid's HTML
+	expiryPatterns := []string{
+		`Expiry date:\s*</strong>\s*(\d{2}/\d{2}/\d{4})`,
+		`Expiry date:</strong>\s*(\d{2}/\d{2}/\d{4})`,
+		`Expiry date</strong>\s*(\d{2}/\d{2}/\d{4})`,
+		`"expiryDate":"([^"]+)"`,
+		`data-expiry="([^"]+)"`,
+	}
+
+	for _, pattern := range expiryPatterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(html)
+		if len(matches) > 1 {
+			expiryDate = matches[1]
+			break
+		}
+	}
+
+	// Look for registrar name
+	registrarPatterns := []string{
+		`Registrar:\s*</strong>\s*([^<\n]+)`,
+		`Registrar:</strong>\s*([^<\n]+)`,
+		`Registrar</strong>\s*([^<\n]+)`,
+		`"registrar":"([^"]+)"`,
+		`data-registrar="([^"]+)"`,
+	}
+
+	for _, pattern := range registrarPatterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(html)
+		if len(matches) > 1 {
+			registrarName = strings.TrimSpace(matches[1])
+			break
+		}
+	}
+
+	// Look for status
+	statusPatterns := []string{
+		`Status:\s*</strong>\s*([^<\n]+)`,
+		`Status:</strong>\s*([^<\n]+)`,
+		`Status</strong>\s*([^<\n]+)`,
+		`"status":"([^"]+)"`,
+		`data-status="([^"]+)"`,
+	}
+
+	for _, pattern := range statusPatterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(html)
+		if len(matches) > 1 {
+			status = strings.TrimSpace(matches[1])
+			break
+		}
+	}
+
+	// Parse expiry date if found
+	var parsedExpiry *time.Time
+	if expiryDate != "" {
+		// Try DD/MM/YYYY format first
+		if parsed, err := time.Parse("02/01/2006", expiryDate); err == nil {
+			parsedExpiry = &parsed
+		} else if parsed, err := time.Parse("2006-01-02", expiryDate); err == nil {
+			parsedExpiry = &parsed
+		}
+	}
+
+	// Create WHOIS data structure
+	var statuses []string
+	if status != "" {
+		statuses = []string{status}
+	}
+
+	return &domain.WHOISData{
+		DomainName: domainName,
+		Status:     statuses,
+		DNSSEC:     "",
+		Dates: domain.WHOISDates{
+			ExpiryDate:   parsedExpiry,
+			CreationDate: nil,
+			UpdatedDate:  nil,
+		},
+		Registrar: domain.WHOISRegistrar{
+			Name: registrarName,
+			ID:   "",
+			URL:  "",
+		},
+		Registrant: domain.WHOISContact{
+			Name:         "NOT DISCLOSED",
+			Organization: "",
+		},
+	}, nil
+}
+
 // parseWHOISOutput parses the raw WHOIS text output
 func (s *LookupService) parseWHOISOutput(output, domainName string) (*domain.WHOISData, error) {
 	lines := strings.Split(output, "\n")
 	data := make(map[string]string)
+
+	// Special handling for .eu domains which have a different format
+	parts := strings.Split(domainName, ".")
+	isEUDomain := len(parts) >= 2 && strings.ToLower(parts[len(parts)-1]) == "eu"
+
+	if isEUDomain {
+		return s.parseEUWHOIS(output, domainName)
+	}
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -465,6 +908,7 @@ func (s *LookupService) parseWHOISOutput(output, domainName string) (*domain.WHO
 	)
 
 	// Extract registrar - try multiple field names used by different WHOIS servers
+	// .eu domains use "Name:" under Registrar section
 	registrarName := data["registrar"]
 	if registrarName == "" {
 		registrarName = data["registrar_name"]

@@ -21,6 +21,7 @@ import {
 	ArrowUpIcon,
 	EyeIcon,
 	FilterIcon,
+	GripVertical,
 	LayoutGridIcon,
 	LayoutListIcon,
 	PlusIcon,
@@ -96,6 +97,58 @@ export default function SystemsTable() {
 		window.innerWidth < 1024 && filteredData.length < 200 ? "grid" : "table"
 	)
 
+	// Drag and drop state
+	const [draggedItem, setDraggedItem] = useState<SystemRecord | null>(null)
+	const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+	// Handle drag start
+	const handleDragStart = (e: React.DragEvent, item: SystemRecord) => {
+		setDraggedItem(item)
+		e.dataTransfer.effectAllowed = 'move'
+		e.dataTransfer.setData('text/html', e.currentTarget.outerHTML)
+	}
+
+	// Handle drag over
+	const handleDragOver = (e: React.DragEvent, index: number) => {
+		e.preventDefault()
+		e.dataTransfer.dropEffect = 'move'
+		setDragOverIndex(index)
+	}
+
+	// Handle drag leave
+	const handleDragLeave = () => {
+		setDragOverIndex(null)
+	}
+
+	// Handle drop
+	const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+		e.preventDefault()
+		setDragOverIndex(null)
+		
+		if (!draggedItem) return
+		
+		// Find the dragged item's current index
+		const draggedIndex = filteredData.findIndex(item => item.id === draggedItem.id)
+		if (draggedIndex === dropIndex) return
+		
+		// Reorder the data
+		const reorderedData = [...filteredData]
+		reorderedData.splice(draggedIndex, 1)
+		reorderedData.splice(dropIndex, 0, draggedItem)
+		
+		// Update the systems store with new order
+		// This would require backend support to persist the order
+		console.log('Reordered systems:', reorderedData.map(item => ({ id: item.id, name: item.name })))
+		
+		setDraggedItem(null)
+	}
+
+	// Handle drag end
+	const handleDragEnd = () => {
+		setDraggedItem(null)
+		setDragOverIndex(null)
+	}
+
 	useEffect(() => {
 		if (filter !== undefined) {
 			table.getColumn("system")?.setFilterValue(filter)
@@ -138,17 +191,25 @@ export default function SystemsTable() {
 	const CardHead = useMemo(() => {
 		return (
 			<CardHeader className="p-0 mb-3 sm:mb-4">
-				<div className="grid md:flex gap-x-5 gap-y-3 w-full items-end">
-					<div className="px-2 sm:px-1">
-						<CardTitle className="mb-2">
-							<Trans>All Systems</Trans>
-						</CardTitle>
-						<CardDescription className="flex">
-							<Trans>Click on a system to view more information.</Trans>
-						</CardDescription>
+				<div className="flex flex-col gap-4">
+					{/* Title and Add Button Row */}
+					<div className="flex items-center justify-between">
+						<div className="px-2 sm:px-1">
+							<CardTitle className="mb-2">
+								<Trans>All Systems</Trans>
+							</CardTitle>
+							<CardDescription className="flex">
+								<Trans>Click on a system to view more information.</Trans>
+							</CardDescription>
+						</div>
+						<Button onClick={() => setIsAddDialogOpen(true)} className="shrink-0">
+							<PlusIcon className="mr-2 h-4 w-4" />
+							<Trans>Add System</Trans>
+						</Button>
 					</div>
 
-					<div className="flex gap-2 ms-auto w-full md:w-96">
+					{/* Filter and View Controls Row */}
+					<div className="flex gap-2 w-full md:w-96">
 						<div className="relative flex-1">
 							<Input
 								placeholder={t`Filter...`}
@@ -246,11 +307,12 @@ export default function SystemsTable() {
 												}
 												return (
 													<DropdownMenuItem
-														onSelect={(e) => {
-															e.preventDefault()
-															setSorting([{ id: column.id, desc: sorting[0]?.id === column.id && !sorting[0]?.desc }])
-														}}
 														key={column.id}
+														onClick={() => {
+															const isDesc = sorting[0]?.id === column.id && !sorting[0]?.desc
+															setSorting([{ id: column.id, desc: isDesc }])
+														}}
+														className="gap-2"
 													>
 														{Icon}
 														{/* @ts-ignore */}
@@ -264,34 +326,29 @@ export default function SystemsTable() {
 									<div>
 										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
 											<EyeIcon className="size-4" />
-											<Trans>Visible Fields</Trans>
+											<Trans>Columns</Trans>
 										</DropdownMenuLabel>
 										<DropdownMenuSeparator />
-										<div className="px-1.5 pb-1">
-											{columns
-												.filter((column) => column.getCanHide())
-												.map((column) => {
-													return (
-														<DropdownMenuCheckboxItem
-															key={column.id}
-															onSelect={(e) => e.preventDefault()}
-															checked={column.getIsVisible()}
-															onCheckedChange={(value) => column.toggleVisibility(!!value)}
-														>
-															{/* @ts-ignore */}
-															{column.columnDef.name()}
-														</DropdownMenuCheckboxItem>
-													)
-												})}
+										<div className="px-1 pb-1">
+											{columns.map((column) => {
+												if (column.id === "select") return null
+												return (
+													<DropdownMenuCheckboxItem
+														key={column.id}
+														onSelect={(e) => e.preventDefault()}
+														checked={column.getIsVisible()}
+														onCheckedChange={(value) => column.toggleVisibility(!!value)}
+													>
+														{/* @ts-ignore */}
+														{column.columnDef.name()}
+													</DropdownMenuCheckboxItem>
+												)
+											})}
 										</div>
 									</div>
 								</div>
 							</DropdownMenuContent>
 						</DropdownMenu>
-						<Button onClick={() => setIsAddDialogOpen(true)} className="shrink-0">
-							<PlusIcon className="mr-2 h-4 w-4" />
-							<Trans>Add System</Trans>
-						</Button>
 					</div>
 				</div>
 			</CardHeader>
@@ -315,7 +372,18 @@ export default function SystemsTable() {
 				{viewMode === "table" ? (
 					// table layout
 					<div className="rounded-md">
-						<AllSystemsTable table={table} rows={rows} colLength={visibleColumns.length} />
+						<AllSystemsTable 
+						table={table} 
+						rows={rows} 
+						colLength={visibleColumns.length}
+						draggedItem={draggedItem}
+						dragOverIndex={dragOverIndex}
+						handleDragStart={handleDragStart}
+						handleDragOver={handleDragOver}
+						handleDragLeave={handleDragLeave}
+						handleDrop={handleDrop}
+						handleDragEnd={handleDragEnd}
+					/>
 					</div>
 				) : (
 					// grid layout
@@ -338,7 +406,29 @@ export default function SystemsTable() {
 }
 
 const AllSystemsTable = memo(
-	({ table, rows, colLength }: { table: TableType<SystemRecord>; rows: Row<SystemRecord>[]; colLength: number }) => {
+	({ 
+		table, 
+		rows, 
+		colLength, 
+		draggedItem, 
+		dragOverIndex, 
+		handleDragStart, 
+		handleDragOver, 
+		handleDragLeave, 
+		handleDrop, 
+		handleDragEnd 
+	}: { 
+		table: TableType<SystemRecord>; 
+		rows: Row<SystemRecord>[]; 
+		colLength: number
+		draggedItem: SystemRecord | null
+		dragOverIndex: number | null
+		handleDragStart: (e: React.DragEvent, item: SystemRecord) => void
+		handleDragOver: (e: React.DragEvent, index: number) => void
+		handleDragLeave: () => void
+		handleDrop: (e: React.DragEvent, index: number) => void
+		handleDragEnd: () => void
+	}) => {
 		// The virtualizer will need a reference to the scrollable container element
 		const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -377,6 +467,13 @@ const AllSystemsTable = memo(
 											virtualRow={virtualRow}
 											length={rows.length}
 											colLength={colLength}
+											draggedItem={draggedItem}
+											dragOverIndex={dragOverIndex}
+											handleDragStart={handleDragStart}
+											handleDragOver={handleDragOver}
+											handleDragLeave={handleDragLeave}
+											handleDrop={handleDrop}
+											handleDragEnd={handleDragEnd}
 										/>
 									)
 								})
@@ -418,32 +515,73 @@ const SystemTableRow = memo(
 		row,
 		virtualRow,
 		colLength,
+		draggedItem,
+		dragOverIndex,
+		handleDragStart,
+		handleDragOver,
+		handleDragLeave,
+		handleDrop,
+		handleDragEnd,
 	}: {
 		row: Row<SystemRecord>
 		virtualRow: VirtualItem
 		length: number
 		colLength: number
+		draggedItem: SystemRecord | null
+		dragOverIndex: number | null
+		handleDragStart: (e: React.DragEvent, item: SystemRecord) => void
+		handleDragOver: (e: React.DragEvent, index: number) => void
+		handleDragLeave: () => void
+		handleDrop: (e: React.DragEvent, index: number) => void
+		handleDragEnd: () => void
 	}) => {
 		const system = row.original
 		const { t } = useLingui()
+		const isDragged = draggedItem?.id === system.id
+		const isDragOver = dragOverIndex === virtualRow.index
+		
 		return useMemo(() => {
 			return (
 				<TableRow
+					draggable
+					onDragStart={(e) => handleDragStart(e, system)}
+					onDragOver={(e) => handleDragOver(e, virtualRow.index)}
+					onDragLeave={handleDragLeave}
+					onDrop={(e) => handleDrop(e, virtualRow.index)}
+					onDragEnd={handleDragEnd}
 					// data-state={row.getIsSelected() && "selected"}
 					className={cn("cursor-pointer transition-opacity relative safari:transform-3d", {
 						"opacity-50": system.status === SystemStatus.Paused,
+						"opacity-30": isDragged,
+						"border-t-2 border-b-2 border-blue-500 bg-blue-50": isDragOver,
 					})}
 				>
-					{row.getVisibleCells().map((cell) => (
+					{row.getVisibleCells().map((cell, index) => (
 						<TableCell
 							key={cell.id}
 							style={{
 								width: cell.column.getSize(),
 								height: virtualRow.size,
 							}}
-							className="py-0 ps-4.5"
+							className={cn("py-0", index === 0 ? "ps-2" : "ps-4.5")}
 						>
-							{flexRender(cell.column.columnDef.cell, cell.getContext())}
+							{index === 0 ? (
+								<div className="flex items-center gap-2">
+									<div 
+										className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+										onDragStart={(e) => handleDragStart(e, system)}
+										onDragOver={(e) => handleDragOver(e, virtualRow.index)}
+										onDragLeave={handleDragLeave}
+										onDrop={(e) => handleDrop(e, virtualRow.index)}
+										onDragEnd={handleDragEnd}
+									>
+										<GripVertical className="h-4 w-4 text-muted-foreground" />
+									</div>
+									{flexRender(cell.column.columnDef.cell, cell.getContext())}
+								</div>
+							) : (
+								flexRender(cell.column.columnDef.cell, cell.getContext())
+							)}
 						</TableCell>
 					))}
 				</TableRow>
