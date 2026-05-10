@@ -3,6 +3,7 @@ package domains
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -143,21 +144,73 @@ func (sd *SubdomainDiscovery) dnsBruteForce(ctx context.Context, domainName stri
 	wg.Wait()
 }
 
-// ctLogSearch searches certificate transparency logs
+// ctLogSearch searches certificate transparency logs via crt.sh
 func (sd *SubdomainDiscovery) ctLogSearch(ctx context.Context, domainName string, results chan<- DiscoveryResult) {
 	// Query crt.sh for certificates
 	url := fmt.Sprintf("https://crt.sh/?q=%%.%s&output=json", domainName)
 
-	resp, err := sd.client.Get(url)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		log.Printf("[subdomain-discovery] CT log search failed for %s: %v", domainName, err)
+		return
+	}
+
+	resp, err := sd.client.Do(req)
 	if err != nil {
 		log.Printf("[subdomain-discovery] CT log search failed for %s: %v", domainName, err)
 		return
 	}
 	defer resp.Body.Close()
 
-	// Parse response (simplified - in production would parse JSON)
-	// For now, just log that we attempted this
-	log.Printf("[subdomain-discovery] CT log search attempted for %s (status: %d)", domainName, resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[subdomain-discovery] CT log search returned status %d for %s", resp.StatusCode, domainName)
+		return
+	}
+
+	// Parse crt.sh JSON response
+	var entries []struct {
+		NameValue string `json:"name_value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		log.Printf("[subdomain-discovery] Failed to parse CT log response for %s: %v", domainName, err)
+		return
+	}
+
+	seen := make(map[string]bool)
+	for _, entry := range entries {
+		// crt.sh returns one name_value per line, may contain wildcards or multiple names
+		names := strings.Split(entry.NameValue, "\n")
+		for _, name := range names {
+			name = strings.TrimSpace(name)
+			if name == "" || name == domainName {
+				continue
+			}
+			// Remove wildcard prefix
+			name = strings.TrimPrefix(name, "*.")
+			// Only include subdomains of the target domain
+			if !strings.HasSuffix(name, "."+domainName) {
+				continue
+			}
+			subdomain := strings.TrimSuffix(name, "."+domainName)
+			if subdomain == "" || seen[subdomain] {
+				continue
+			}
+			seen[subdomain] = true
+
+			// Try to resolve IPs
+			ips, _ := net.LookupHost(name)
+
+			results <- DiscoveryResult{
+				Subdomain:   subdomain,
+				FullDomain:  name,
+				IPAddresses: ips,
+				Source:      "certificate",
+				FoundAt:     time.Now(),
+			}
+		}
+	}
+
+	log.Printf("[subdomain-discovery] CT log search found %d unique subdomains for %s", len(seen), domainName)
 }
 
 // patternEnumeration enumerates common subdomain patterns

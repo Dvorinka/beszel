@@ -40,16 +40,16 @@ func (h *APIHandler) RegisterRoutes(se *core.ServeEvent) {
 	// CRUD endpoints
 	api.GET("", h.listMonitors)
 	api.POST("", h.createMonitor)
-	api.GET("/:id", h.getMonitor)
-	api.PATCH("/:id", h.updateMonitor)
-	api.DELETE("/:id", h.deleteMonitor)
+	api.GET("/{id}", h.getMonitor)
+	api.PATCH("/{id}", h.updateMonitor)
+	api.DELETE("/{id}", h.deleteMonitor)
 
 	// Action endpoints
-	api.POST("/:id/check", h.manualCheck)
-	api.POST("/:id/pause", h.pauseMonitor)
-	api.POST("/:id/resume", h.resumeMonitor)
-	api.GET("/:id/stats", h.getStats)
-	api.GET("/:id/heartbeats", h.getHeartbeats)
+	api.POST("/{id}/check", h.manualCheck)
+	api.POST("/{id}/pause", h.pauseMonitor)
+	api.POST("/{id}/resume", h.resumeMonitor)
+	api.GET("/{id}/stats", h.getStats)
+	api.GET("/{id}/heartbeats", h.getHeartbeats)
 }
 
 // HeartbeatSummary represents a minimal heartbeat for the monitor list

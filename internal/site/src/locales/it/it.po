@@ -512,8 +512,8 @@ msgid "Close"
 msgstr ""
 
 #: src/components/systems-table/systems-table.tsx
-#~ msgid "Columns"
-#~ msgstr ""
+msgid "Columns"
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -790,6 +790,10 @@ msgstr "Utilizzo del disco di {extraFsName}"
 
 #: src/components/routes/system/info-bar.tsx
 msgctxt "Layout display options"
+msgid "Display"
+msgstr ""
+
+#: src/components/monitors-table/monitors-table.tsx
 msgid "Display"
 msgstr ""
 
@@ -1460,8 +1464,8 @@ msgid "Net"
 msgstr "Rete"
 
 #: src/components/monitors-table/monitors-table.tsx
-msgid "Network (Grouped)"
-msgstr ""
+#~ msgid "Network (Grouped)"
+#~ msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of docker containers"
@@ -2461,8 +2465,8 @@ msgid "View your 200 most recent alerts."
 msgstr "Visualizza i tuoi 200 avvisi più recenti."
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Visible Fields"
-msgstr "Colonne visibili"
+#~ msgid "Visible Fields"
+#~ msgstr "Colonne visibili"
 
 #: src/components/routes/domain.tsx
 #: src/components/routes/monitor.tsx

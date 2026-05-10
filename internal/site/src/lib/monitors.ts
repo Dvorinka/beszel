@@ -340,6 +340,13 @@ export function formatPing(ping: number): string {
 	return `${(ping / 1000).toFixed(2)}s`
 }
 
+// Favicon URL helper - uses Google's favicon service as fallback
+export function getMonitorFaviconUrl(monitor: Monitor): string | null {
+	const hostname = extractHostnameFromMonitor(monitor)
+	if (!hostname) return null
+	return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`
+}
+
 // Domain extraction and grouping utilities
 export function extractHostnameFromMonitor(monitor: Monitor): string | null {
 	if (monitor.hostname) {

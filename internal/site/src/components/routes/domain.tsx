@@ -109,6 +109,7 @@ export default function DomainDetail({ id }: { id: string }) {
 	const queryClient = useQueryClient()
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 	const [isDeleting, setIsDeleting] = useState(false)
+	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 	const [expiryDialogOpen, setExpiryDialogOpen] = useState(false)
 	const [manualExpiryDate, setManualExpiryDate] = useState("")
 	const [manualPurchaseDate, setManualPurchaseDate] = useState("")

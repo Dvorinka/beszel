@@ -154,6 +154,9 @@ export interface CreateDomainRequest {
 	quiet_hours_enabled?: boolean
 	quiet_hours_start?: string
 	quiet_hours_end?: string
+	// Manual expiry override when WHOIS fails
+	expiry_date?: string
+	creation_date?: string
 }
 
 export interface UpdateDomainRequest {

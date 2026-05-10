@@ -58,6 +58,7 @@ import { useToast } from "@/components/ui/use-toast"
 import {
 	deleteMonitor,
 	getMonitorTypeLabel,
+	getMonitorFaviconUrl,
 	listMonitors,
 	manualCheck,
 	pauseMonitor,
@@ -101,13 +102,35 @@ function StatusIndicator({ status }: { status: MonitorStatus }) {
 	)
 }
 
+// Favicon component
+function MonitorFavicon({ monitor, className }: { monitor: Monitor; className?: string }) {
+	const [error, setError] = useState(false)
+	const faviconUrl = getMonitorFaviconUrl(monitor)
+
+	if (!faviconUrl || error) {
+		return <GlobeIcon className={cn("h-4 w-4 text-muted-foreground", className)} />
+	}
+
+	return (
+		<img
+			src={faviconUrl}
+			alt=""
+			className={cn("h-4 w-4 object-contain", className)}
+			onError={() => setError(true)}
+			loading="lazy"
+		/>
+	)
+}
+
 // Monitor Card component for grid view
 function MonitorCard({
 	monitor,
 	onEdit,
+	displayOptions,
 }: {
 	monitor: Monitor
 	onEdit: (m: Monitor) => void
+	displayOptions: DisplayOptions
 }) {
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
@@ -146,7 +169,10 @@ function MonitorCard({
 			<div className="flex items-start justify-between">
 				<Link href={`/monitor/${monitor.id}`} className="flex items-center gap-3 cursor-pointer min-w-0">
 					<div className="shrink-0">
-						<StatusIndicator status={monitor.status} />
+						<div className="flex items-center gap-2">
+							<MonitorFavicon monitor={monitor} className="h-5 w-5" />
+							<StatusIndicator status={monitor.status} />
+						</div>
 					</div>
 					<div className="min-w-0">
 						<div className="font-medium truncate hover:underline">{monitor.name}</div>
@@ -187,15 +213,21 @@ function MonitorCard({
 				</div>
 				
 				{/* Uptime - Prominent pill display */}
-				<div className="flex flex-col gap-2">
-					<div className="flex items-center gap-2 flex-wrap">
-						<UptimePill uptime={monitor.uptime_stats?.uptime_24h ?? 100} label="24h" />
-						{monitor.uptime_stats?.uptime_7d !== undefined && monitor.uptime_stats.uptime_7d !== monitor.uptime_stats?.uptime_24h && (
-							<UptimePill uptime={monitor.uptime_stats.uptime_7d} label="7d" />
+				{displayOptions.showUptimePills && (
+					<div className="flex flex-col gap-2">
+						<div className="flex items-center gap-2 flex-wrap">
+							{displayOptions.showUptimePercentage && (
+								<UptimePill uptime={monitor.uptime_stats?.uptime_24h ?? 100} label="24h" />
+							)}
+							{displayOptions.showUptimePercentage && monitor.uptime_stats?.uptime_7d !== undefined && monitor.uptime_stats.uptime_7d !== monitor.uptime_stats?.uptime_24h && (
+								<UptimePill uptime={monitor.uptime_stats.uptime_7d} label="7d" />
+							)}
+						</div>
+						{displayOptions.showHeartbeatDots && (
+							<UptimeDots heartbeats={monitor.recent_heartbeats} />
 						)}
 					</div>
-					<UptimeDots heartbeats={monitor.recent_heartbeats} />
-				</div>
+				)}
 				
 				<div className="flex items-center justify-between text-sm">
 					<div className="text-xs text-muted-foreground">Response</div>
@@ -366,9 +398,11 @@ function UptimeDots({ heartbeats }: { heartbeats?: Array<{ status: string; time:
 function MonitorRow({
 	monitor,
 	onEdit,
+	displayOptions,
 }: {
 	monitor: Monitor
 	onEdit: (m: Monitor) => void
+	displayOptions: DisplayOptions
 }) {
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
@@ -412,7 +446,7 @@ function MonitorRow({
 		<TableRow>
 			<TableCell>
 				<Link href={`/monitor/${monitor.id}`} className="flex items-center gap-3 cursor-pointer">
-					<GlobeIcon className="h-4 w-4 text-muted-foreground" />
+					<MonitorFavicon monitor={monitor} className="h-5 w-5" />
 					<div>
 						<div className="font-medium hover:underline">{monitor.name}</div>
 						<div className="text-xs text-muted-foreground">
@@ -440,7 +474,11 @@ function MonitorRow({
 				)}
 			</TableCell>
 			<TableCell>
-				<UptimeBar stats={monitor.uptime_stats} />
+				{displayOptions.showUptimePills ? (
+					<UptimeBar stats={monitor.uptime_stats} />
+				) : (
+					<span className="text-sm text-muted-foreground">-</span>
+				)}
 			</TableCell>
 			<TableCell>
 				<div className="flex flex-wrap gap-1">
@@ -534,6 +572,12 @@ type ViewMode = "table" | "grid"
 type StatusFilter = "all" | MonitorStatus
 type TypeFilter = "all" | MonitorType
 
+interface DisplayOptions {
+	showUptimePills: boolean
+	showUptimePercentage: boolean
+	showHeartbeatDots: boolean
+}
+
 // Main component
 export default memo(function MonitorsTable() {
 	const { t } = useLingui()
@@ -547,6 +591,11 @@ export default memo(function MonitorsTable() {
 	const [viewMode, setViewMode] = useBrowserStorage<ViewMode>(
 		"monitorsViewMode",
 		window.innerWidth < 1024 ? "grid" : "table"
+	)
+
+	const [displayOptions, setDisplayOptions] = useBrowserStorage<DisplayOptions>(
+		"monitorsDisplayOptions",
+		{ showUptimePills: true, showUptimePercentage: true, showHeartbeatDots: true }
 	)
 
 	const { data: monitors = [], isLoading } = useQuery({
@@ -746,6 +795,42 @@ export default memo(function MonitorsTable() {
 								</DropdownMenuRadioGroup>
 								<DropdownMenuSeparator />
 
+								{/* Display Options */}
+								<DropdownMenuLabel className="flex items-center gap-2">
+									<Settings2Icon className="size-4" />
+									<Trans>Display</Trans>
+								</DropdownMenuLabel>
+								<div className="px-2 py-1 space-y-1">
+									<label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+										<input
+											type="checkbox"
+											checked={displayOptions.showUptimePills}
+											onChange={(e) => setDisplayOptions({ ...displayOptions, showUptimePills: e.target.checked })}
+											className="rounded border-gray-300"
+										/>
+										<span>Show uptime pills</span>
+									</label>
+									<label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+										<input
+											type="checkbox"
+											checked={displayOptions.showUptimePercentage}
+											onChange={(e) => setDisplayOptions({ ...displayOptions, showUptimePercentage: e.target.checked })}
+											className="rounded border-gray-300"
+										/>
+										<span>Show percentage</span>
+									</label>
+									<label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+										<input
+											type="checkbox"
+											checked={displayOptions.showHeartbeatDots}
+											onChange={(e) => setDisplayOptions({ ...displayOptions, showHeartbeatDots: e.target.checked })}
+											className="rounded border-gray-300"
+										/>
+										<span>Show heartbeat dots</span>
+									</label>
+								</div>
+								<DropdownMenuSeparator />
+
 								{/* Status Filter */}
 								<DropdownMenuLabel className="flex items-center gap-2">
 									<FilterIcon className="size-4" />
@@ -834,6 +919,7 @@ export default memo(function MonitorsTable() {
 									key={monitor.id}
 									monitor={monitor}
 									onEdit={setEditingMonitor}
+									displayOptions={displayOptions}
 								/>
 							))}
 						</TableBody>
@@ -845,6 +931,7 @@ export default memo(function MonitorsTable() {
 								key={monitor.id}
 								monitor={monitor}
 								onEdit={setEditingMonitor}
+								displayOptions={displayOptions}
 							/>
 						))}
 					</div>

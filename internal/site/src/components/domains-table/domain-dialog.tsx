@@ -36,7 +36,7 @@ import {
 	type UpdateDomainRequest,
 	type DomainLookupResult,
 } from "@/lib/domains"
-import { Loader2, Search } from "lucide-react"
+import { Loader2, Search, AlertTriangle, Calendar } from "lucide-react"
 
 const formSchema = z.object({
 	domain_name: z.string().min(1, "Domain name is required"),
@@ -79,6 +79,13 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 	const [activeTab, setActiveTab] = useState("basic")
 	const [lookupData, setLookupData] = useState<DomainLookupResult | null>(null)
 	const [isLookingUp, setIsLookingUp] = useState(false)
+	// Manual expiry inputs when WHOIS fails
+	const [manualRegDate, setManualRegDate] = useState(() => {
+		const today = new Date()
+		return today.toISOString().split("T")[0]
+	})
+	const [manualRegPeriod, setManualRegPeriod] = useState<number>(1)
+	const [manualPurchasePrice, setManualPurchasePrice] = useState<number>(0)
 
 	const form = useForm<FormData>({
 		resolver: zodResolver(formSchema),
@@ -163,6 +170,10 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 				quiet_hours_end: "08:00",
 			})
 			setLookupData(null)
+			const today = new Date().toISOString().split("T")[0]
+			setManualRegDate(today)
+			setManualRegPeriod(1)
+			setManualPurchasePrice(0)
 		}
 	}, [open, isEdit, domain, form])
 
@@ -207,6 +218,11 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 		try {
 			const data = await lookupDomain(domainName)
 			setLookupData(data)
+			// Reset manual inputs on new lookup
+			const today = new Date().toISOString().split("T")[0]
+			setManualRegDate(today)
+			setManualRegPeriod(1)
+			setManualPurchasePrice(0)
 			toast({ title: "Domain info retrieved successfully" })
 		} catch (error) {
 			toast({
@@ -217,6 +233,17 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 		} finally {
 			setIsLookingUp(false)
 		}
+	}
+
+	// Calculate expiry date from registration date + period in years
+	const calculateExpiryDate = (regDateStr: string, years: number): string | null => {
+		const regDate = new Date(regDateStr)
+		if (isNaN(regDate.getTime())) return null
+		const expiry = new Date(regDate)
+		expiry.setFullYear(expiry.getFullYear() + years)
+		// Subtract 1 day (expiry is typically the day before the anniversary)
+		expiry.setDate(expiry.getDate() - 1)
+		return expiry.toISOString().split("T")[0]
 	}
 
 	const onSubmit = (data: FormData) => {
@@ -245,6 +272,19 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 			quiet_hours_enabled: data.quiet_hours_enabled,
 			quiet_hours_start: data.quiet_hours_enabled ? data.quiet_hours_start : undefined,
 			quiet_hours_end: data.quiet_hours_enabled ? data.quiet_hours_end : undefined,
+		}
+
+		// If lookup returned no expiry, attach manual dates
+		if (!isEdit && lookupData && !lookupData.expiry_date) {
+			const calculatedExpiry = calculateExpiryDate(manualRegDate, manualRegPeriod)
+			if (calculatedExpiry) {
+				payload.expiry_date = calculatedExpiry
+				payload.creation_date = manualRegDate
+			}
+			// Use the manual purchase price if set (overrides form value when WHOIS fails)
+			if (manualPurchasePrice > 0) {
+				payload.purchase_price = manualPurchasePrice
+			}
 		}
 
 		if (isEdit && domain) {
@@ -384,19 +424,91 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 								/>
 
 								{lookupData && !isEdit && (
-									<div className="rounded-lg border p-4 space-y-2">
-										<h4 className="font-medium">Lookup Results</h4>
-										{lookupData.registrar_name && (
-											<p className="text-sm">Registrar: {lookupData.registrar_name}</p>
-										)}
-										{lookupData.expiry_date && (
-											<p className="text-sm">Expires: {lookupData.expiry_date}</p>
-										)}
-										{lookupData.ssl_valid_to && (
-											<p className="text-sm">SSL Expires: {lookupData.ssl_valid_to}</p>
-										)}
-										{lookupData.host_country && (
-											<p className="text-sm">Location: {lookupData.host_country}</p>
+									<div className="space-y-3">
+										{/* Lookup Results */}
+										<div className="rounded-lg border p-4 space-y-2">
+											<h4 className="font-medium">Lookup Results</h4>
+											{lookupData.registrar_name && (
+												<p className="text-sm">Registrar: {lookupData.registrar_name}</p>
+											)}
+											{lookupData.expiry_date && (
+												<p className="text-sm">Expires: {lookupData.expiry_date}</p>
+											)}
+											{lookupData.ssl_valid_to && (
+												<p className="text-sm">SSL Expires: {lookupData.ssl_valid_to}</p>
+											)}
+											{lookupData.host_country && (
+												<p className="text-sm">Location: {lookupData.host_country}</p>
+											)}
+										</div>
+
+										{/* Manual expiry fallback when WHOIS doesn't return expiry */}
+										{!lookupData.expiry_date && (
+											<div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4 space-y-3">
+												<div className="flex items-center gap-2 text-yellow-700">
+													<AlertTriangle className="h-4 w-4" />
+													<h4 className="font-medium text-sm">Expiry date not found in WHOIS</h4>
+												</div>
+												<p className="text-xs text-muted-foreground">
+													Enter your registration details below and we&apos;ll calculate the expiry date.
+												</p>
+
+												<div className="grid grid-cols-2 gap-3">
+													<div className="space-y-1">
+														<label className="text-xs font-medium">Registration Date</label>
+														<div className="flex items-center gap-2">
+															<Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+															<Input
+																type="date"
+																value={manualRegDate}
+																onChange={(e) => setManualRegDate(e.target.value)}
+																className="h-8 text-sm"
+															/>
+														</div>
+													</div>
+													<div className="space-y-1">
+														<label className="text-xs font-medium">Registration Period</label>
+														<select
+															value={manualRegPeriod}
+															onChange={(e) => setManualRegPeriod(Number(e.target.value))}
+															className="w-full h-8 px-2 rounded-md border border-input bg-background text-sm"
+														>
+															<option value={1}>1 year</option>
+															<option value={2}>2 years</option>
+															<option value={3}>3 years</option>
+															<option value={5}>5 years</option>
+															<option value={10}>10 years</option>
+														</select>
+													</div>
+												</div>
+
+												<div className="space-y-1">
+													<label className="text-xs font-medium">Purchase Price (total for selected period)</label>
+													<Input
+															type="number"
+															min={0}
+															step="0.01"
+															value={manualPurchasePrice || ""}
+															placeholder="e.g. 29.99"
+															onChange={(e) => setManualPurchasePrice(Number(e.target.value))}
+															className="h-8 text-sm"
+														/>
+														{manualPurchasePrice > 0 && manualRegPeriod > 1 && (
+															<p className="text-[10px] text-muted-foreground">
+																~{(manualPurchasePrice / manualRegPeriod).toFixed(2)} per year
+															</p>
+														)}
+												</div>
+
+												{manualRegDate && manualRegPeriod > 0 && (
+													<div className="rounded-md bg-muted p-2 text-xs">
+														<p className="font-medium">Calculated Expiry:</p>
+														<p className="text-muted-foreground">
+															{calculateExpiryDate(manualRegDate, manualRegPeriod)}
+														</p>
+													</div>
+												)}
+											</div>
 										)}
 									</div>
 								)}

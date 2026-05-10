@@ -128,6 +128,9 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 		NotifyOnSSL     bool     `json:"notify_on_ssl_expiry"`
 		NotifyOnDNS     bool     `json:"notify_on_dns_change"`
 		NotifyOnReg     bool     `json:"notify_on_registrar_change"`
+		// Manual expiry override when WHOIS fails
+		ExpiryDate   string `json:"expiry_date,omitempty"`
+		CreationDate string `json:"creation_date,omitempty"`
 	}
 	if err := json.NewDecoder(e.Request.Body).Decode(&req); err != nil {
 		return e.BadRequestError("invalid request body", err)
@@ -179,6 +182,7 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 	record.Set("user", authRecord.Id)
 
 	// Auto-lookup if requested
+	lookupHadExpiry := false
 	if req.AutoLookup {
 		lookupSvc := whois.NewLookupService("")
 		ctx := e.Request.Context()
@@ -188,6 +192,7 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 			// Calculate status based on lookup results
 			status := domain.DomainStatusUnknown
 			if domainData.ExpiryDate != nil {
+				lookupHadExpiry = true
 				daysUntil := int(time.Until(*domainData.ExpiryDate).Hours() / 24)
 				if daysUntil < 0 {
 					status = domain.DomainStatusExpired
@@ -201,6 +206,29 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 				status = domain.DomainStatusActive
 			}
 			record.Set("status", status)
+		}
+	}
+
+	// Apply manual expiry/creation dates if WHOIS didn't find them
+	if !lookupHadExpiry {
+		if req.ExpiryDate != "" {
+			if t, err := time.Parse("2006-01-02", req.ExpiryDate); err == nil {
+				record.Set("expiry_date", t)
+				// Recalculate status with manual expiry
+				daysUntil := int(time.Until(t).Hours() / 24)
+				status := domain.DomainStatusActive
+				if daysUntil < 0 {
+					status = domain.DomainStatusExpired
+				} else if daysUntil <= req.AlertDaysBefore {
+					status = domain.DomainStatusExpiring
+				}
+				record.Set("status", status)
+			}
+		}
+		if req.CreationDate != "" {
+			if t, err := time.Parse("2006-01-02", req.CreationDate); err == nil {
+				record.Set("creation_date", t)
+			}
 		}
 	}
 

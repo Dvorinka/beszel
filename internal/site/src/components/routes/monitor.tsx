@@ -37,6 +37,7 @@ import {
 } from "lucide-react"
 import {
 	type Heartbeat,
+	type Monitor,
 	getMonitor,
 	getMonitorStats,
 	getMonitorHeartbeats,
@@ -45,6 +46,7 @@ import {
 	resumeMonitor,
 	deleteMonitor,
 	getMonitorTypeLabel,
+	getMonitorFaviconUrl,
 	formatUptime,
 	formatPing,
 } from "@/lib/monitors"
@@ -457,6 +459,16 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 	const headerIconColor = isUp ? "text-green-500" : isPaused ? "text-gray-500" : isPending ? "text-yellow-500" : "text-red-500"
 	const headerBgColor = isUp ? "bg-green-500/10" : isPaused ? "bg-gray-500/10" : isPending ? "bg-yellow-500/10" : "bg-red-500/10"
 
+	// Favicon component
+	function MonitorFaviconImage({ monitor }: { monitor: Monitor }) {
+		const [error, setError] = useState(false)
+		const faviconUrl = getMonitorFaviconUrl(monitor)
+		if (!faviconUrl || error) {
+			return <Globe className={cn("h-6 w-6", headerIconColor)} />
+		}
+		return <img src={faviconUrl} alt="" className="h-6 w-6 object-contain" onError={() => setError(true)} />
+	}
+
 	return (
 		<div className="grid gap-4 mb-14">
 			{/* Header */}
@@ -470,7 +482,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 									headerBgColor
 								)}
 							>
-								<Globe className={cn("h-6 w-6", headerIconColor)} />
+								<MonitorFaviconImage monitor={monitor} />
 							</div>
 							<div>
 								<h1 className="text-2xl font-bold">{monitor.name}</h1>

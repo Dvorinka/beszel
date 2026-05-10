@@ -512,8 +512,8 @@ msgid "Close"
 msgstr ""
 
 #: src/components/systems-table/systems-table.tsx
-#~ msgid "Columns"
-#~ msgstr ""
+msgid "Columns"
+msgstr ""
 
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
@@ -792,6 +792,10 @@ msgstr "Schijfgebruik van {extraFsName}"
 msgctxt "Layout display options"
 msgid "Display"
 msgstr "Weergave"
+
+#: src/components/monitors-table/monitors-table.tsx
+msgid "Display"
+msgstr ""
 
 #: src/components/domains-table/domains-table.tsx
 msgid "Display Columns"
@@ -1460,8 +1464,8 @@ msgid "Net"
 msgstr "Netwerk"
 
 #: src/components/monitors-table/monitors-table.tsx
-msgid "Network (Grouped)"
-msgstr ""
+#~ msgid "Network (Grouped)"
+#~ msgstr ""
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Network traffic of docker containers"
@@ -2461,8 +2465,8 @@ msgid "View your 200 most recent alerts."
 msgstr "Bekijk je 200 meest recente meldingen."
 
 #: src/components/systems-table/systems-table.tsx
-msgid "Visible Fields"
-msgstr "Zichtbare kolommen"
+#~ msgid "Visible Fields"
+#~ msgstr "Zichtbare kolommen"
 
 #: src/components/routes/domain.tsx
 #: src/components/routes/monitor.tsx
