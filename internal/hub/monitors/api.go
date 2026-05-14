@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/henrygd/beszel/internal/entities/monitor"
+	"github.com/henrygd/beszel/internal/hub/pagespeed"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -50,6 +51,7 @@ func (h *APIHandler) RegisterRoutes(se *core.ServeEvent) {
 	api.POST("/{id}/resume", h.resumeMonitor)
 	api.GET("/{id}/stats", h.getStats)
 	api.GET("/{id}/heartbeats", h.getHeartbeats)
+	api.POST("/{id}/pagespeed", h.runPageSpeedCheck)
 }
 
 // HeartbeatSummary represents a minimal heartbeat for the monitor list
@@ -606,6 +608,64 @@ func (h *APIHandler) getStats(e *core.RequestEvent) error {
 		"uptime_percent_7d":  percent(stats7d),
 		"uptime_percent_30d": percent(stats30d),
 		"avg_ping_24h":       avg24h,
+	})
+}
+
+// runPageSpeedCheck runs a PageSpeed Insights check for a monitor
+func (h *APIHandler) runPageSpeedCheck(e *core.RequestEvent) error {
+	id := e.Request.PathValue("id")
+	if id == "" {
+		return e.BadRequestError("Monitor ID is required", nil)
+	}
+
+	record, err := h.app.FindRecordById("monitors", id)
+	if err != nil {
+		return e.NotFoundError("Monitor not found", err)
+	}
+
+	if record.GetString("user") != e.Auth.Id {
+		return e.ForbiddenError("Access denied", nil)
+	}
+
+	url := record.GetString("url")
+	if url == "" {
+		return e.BadRequestError("Monitor does not have a URL", nil)
+	}
+
+	// Get strategy from query param, default to mobile
+	strategy := e.Request.URL.Query().Get("strategy")
+	if strategy == "" {
+		strategy = "mobile"
+	}
+	if strategy != "mobile" && strategy != "desktop" {
+		return e.BadRequestError("strategy must be 'mobile' or 'desktop'", nil)
+	}
+
+	checker := pagespeed.NewChecker("")
+	metrics, err := checker.CheckURL(url, strategy)
+	if err != nil {
+		return e.InternalServerError("PageSpeed check failed", err)
+	}
+
+	vitals := pagespeed.GetCoreWebVitalsStatus(metrics)
+
+	return e.JSON(http.StatusOK, map[string]interface{}{
+		"performance":   metrics.Performance,
+		"accessibility": metrics.Accessibility,
+		"bestPractices": metrics.BestPractices,
+		"seo":           metrics.SEO,
+		"pwa":           metrics.PWA,
+		"fcp":           metrics.FCP,
+		"lcp":           metrics.LCP,
+		"ttfb":          metrics.TTFB,
+		"cls":           metrics.CLS,
+		"tbt":           metrics.TBT,
+		"speedIndex":    metrics.SpeedIndex,
+		"tti":           metrics.TTI,
+		"strategy":      metrics.Strategy,
+		"checkedAt":     metrics.CheckedAt,
+		"url":           metrics.URL,
+		"vitals":        vitals,
 	})
 }
 

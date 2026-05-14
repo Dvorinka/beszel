@@ -1,4 +1,4 @@
-import { memo, useState } from "react"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Trans } from "@lingui/react/macro"
 import { useToast } from "@/components/ui/use-toast"
@@ -33,6 +33,14 @@ import {
 	User,
 	Mail,
 	Building,
+	Key,
+	Eye,
+	EyeOff,
+	Network,
+	Code2,
+	Search,
+	Lock,
+	Unlock,
 	type LucideIcon,
 } from "lucide-react"
 import {
@@ -108,7 +116,6 @@ export default function DomainDetail({ id }: { id: string }) {
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-	const [isDeleting, setIsDeleting] = useState(false)
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 	const [expiryDialogOpen, setExpiryDialogOpen] = useState(false)
 	const [manualExpiryDate, setManualExpiryDate] = useState("")
@@ -266,6 +273,35 @@ export default function DomainDetail({ id }: { id: string }) {
 						icon={MapPin}
 					/>
 				</div>
+				{/* Provider badges row */}
+				{(domain.dns_provider || domain.hosting_provider || domain.email_provider || domain.ca_provider) && (
+					<div className="flex flex-wrap gap-2 mt-2">
+						{domain.dns_provider && (
+							<Badge variant="secondary" className="text-xs gap-1">
+								<Network className="h-3 w-3" />
+								DNS: {domain.dns_provider}
+							</Badge>
+						)}
+						{domain.hosting_provider && (
+							<Badge variant="secondary" className="text-xs gap-1">
+								<Server className="h-3 w-3" />
+								Hosting: {domain.hosting_provider}
+							</Badge>
+						)}
+						{domain.email_provider && (
+							<Badge variant="secondary" className="text-xs gap-1">
+								<Mail className="h-3 w-3" />
+								Email: {domain.email_provider}
+							</Badge>
+						)}
+						{domain.ca_provider && (
+							<Badge variant="secondary" className="text-xs gap-1">
+								<Shield className="h-3 w-3" />
+								CA: {domain.ca_provider}
+							</Badge>
+						)}
+					</div>
+				)}
 			</div>
 
 			{/* Expiry Overview - Clean visual cards */}
@@ -679,6 +715,163 @@ export default function DomainDetail({ id }: { id: string }) {
 				</Card>
 			</div>
 
+			{/* HTTP Headers */}
+			{domain.headers && domain.headers.length > 0 && (
+				<div className="grid gap-4">
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Code2 className="h-5 w-5" />
+								HTTP Headers
+							</CardTitle>
+							<CardDescription>Response headers from the server</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<div className="space-y-1 max-h-80 overflow-y-auto">
+								{domain.headers.map((h, i) => (
+									<div key={i} className="flex items-start gap-2 text-sm py-1 border-b last:border-0">
+										<code className="text-xs text-muted-foreground shrink-0 w-32 truncate">{h.name}</code>
+										<code className="text-xs break-all">{h.value}</code>
+									</div>
+								))}
+							</div>
+						</CardContent>
+					</Card>
+				</div>
+			)}
+
+			{/* SEO Metadata */}
+			{domain.seo_meta && (
+				<div className="grid gap-4">
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Search className="h-5 w-5" />
+								SEO Metadata
+							</CardTitle>
+							<CardDescription>Search engine optimization data</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-6">
+							{/* General Meta */}
+							{domain.seo_meta.general && (
+								<div className="space-y-2">
+									<h4 className="text-sm font-medium">General Meta Tags</h4>
+									<div className="space-y-1 text-sm">
+										{domain.seo_meta.general.title && (
+											<p><span className="text-muted-foreground">Title:</span> {domain.seo_meta.general.title}</p>
+										)}
+										{domain.seo_meta.general.description && (
+											<p><span className="text-muted-foreground">Description:</span> {domain.seo_meta.general.description}</p>
+										)}
+										{domain.seo_meta.general.canonical && (
+											<p><span className="text-muted-foreground">Canonical:</span> <a href={domain.seo_meta.general.canonical} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{domain.seo_meta.general.canonical}</a></p>
+										)}
+										{domain.seo_meta.general.robots && (
+											<p><span className="text-muted-foreground">Robots:</span> {domain.seo_meta.general.robots}</p>
+										)}
+										{domain.seo_meta.general.author && (
+											<p><span className="text-muted-foreground">Author:</span> {domain.seo_meta.general.author}</p>
+										)}
+										{domain.seo_meta.general.keywords && (
+											<p><span className="text-muted-foreground">Keywords:</span> {domain.seo_meta.general.keywords}</p>
+										)}
+									</div>
+								</div>
+							)}
+
+							{/* Open Graph */}
+							{domain.seo_meta.openGraph && (domain.seo_meta.openGraph.title || domain.seo_meta.openGraph.description) && (
+								<div className="space-y-2 pt-4 border-t">
+									<h4 className="text-sm font-medium flex items-center gap-2">
+										<Globe className="h-4 w-4" />
+										Open Graph
+									</h4>
+									<div className="space-y-1 text-sm">
+										{domain.seo_meta.openGraph.title && (
+											<p><span className="text-muted-foreground">Title:</span> {domain.seo_meta.openGraph.title}</p>
+										)}
+										{domain.seo_meta.openGraph.description && (
+											<p><span className="text-muted-foreground">Description:</span> {domain.seo_meta.openGraph.description}</p>
+										)}
+										{domain.seo_meta.openGraph.type && (
+											<p><span className="text-muted-foreground">Type:</span> {domain.seo_meta.openGraph.type}</p>
+										)}
+										{domain.seo_meta.openGraph.url && (
+											<p><span className="text-muted-foreground">URL:</span> <a href={domain.seo_meta.openGraph.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{domain.seo_meta.openGraph.url}</a></p>
+										)}
+										{domain.seo_meta.openGraph.images && domain.seo_meta.openGraph.images.length > 0 && (
+											<div>
+												<p className="text-muted-foreground">Images:</p>
+												<div className="flex flex-wrap gap-2 mt-1">
+													{domain.seo_meta.openGraph.images.map((img, i) => (
+														<a key={i} href={img} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate max-w-[300px]">{img}</a>
+													))}
+												</div>
+											</div>
+										)}
+									</div>
+								</div>
+							)}
+
+							{/* Twitter Cards */}
+							{domain.seo_meta.twitter && (domain.seo_meta.twitter.title || domain.seo_meta.twitter.description) && (
+								<div className="space-y-2 pt-4 border-t">
+									<h4 className="text-sm font-medium flex items-center gap-2">
+										<Mail className="h-4 w-4" />
+										Twitter/X Cards
+									</h4>
+									<div className="space-y-1 text-sm">
+										{domain.seo_meta.twitter.title && (
+											<p><span className="text-muted-foreground">Title:</span> {domain.seo_meta.twitter.title}</p>
+										)}
+										{domain.seo_meta.twitter.description && (
+											<p><span className="text-muted-foreground">Description:</span> {domain.seo_meta.twitter.description}</p>
+										)}
+										{domain.seo_meta.twitter.card && (
+											<p><span className="text-muted-foreground">Card:</span> {domain.seo_meta.twitter.card}</p>
+										)}
+									</div>
+								</div>
+							)}
+
+							{/* Robots.txt */}
+							{domain.seo_meta.robots && domain.seo_meta.robots.fetched && (
+								<div className="space-y-2 pt-4 border-t">
+									<h4 className="text-sm font-medium flex items-center gap-2">
+										<FileText className="h-4 w-4" />
+										robots.txt
+									</h4>
+									{domain.seo_meta.robots.sitemaps && domain.seo_meta.robots.sitemaps.length > 0 && (
+										<div className="mb-2">
+											<p className="text-xs text-muted-foreground">Sitemaps:</p>
+											<div className="flex flex-wrap gap-1 mt-1">
+												{domain.seo_meta.robots.sitemaps.map((sitemap, i) => (
+													<a key={i} href={sitemap} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">{sitemap}</a>
+												))}
+											</div>
+										</div>
+									)}
+									{domain.seo_meta.robots.groups && domain.seo_meta.robots.groups.length > 0 && (
+										<div className="space-y-2">
+											{domain.seo_meta.robots.groups.map((group, i) => (
+												<div key={i} className="rounded bg-muted p-2 text-xs">
+													<p className="text-muted-foreground">User-agent: {group.userAgents.join(", ")}</p>
+													{group.rules.map((rule, j) => (
+														<p key={j} className={rule.type === "Disallow" ? "text-red-500" : "text-green-500"}>
+															{rule.type}: {rule.value}
+														</p>
+													))}
+												</div>
+											))}
+										</div>
+									)}
+								</div>
+							)}
+						</CardContent>
+					</Card>
+				</div>
+			)}
+
 			<div className="grid gap-4">
 				<Card>
 					<CardHeader>
@@ -743,6 +936,47 @@ export default function DomainDetail({ id }: { id: string }) {
 										</div>
 									)}
 								</div>
+
+								{/* Certificate Chain */}
+								{domain.certificates && domain.certificates.length > 0 && (
+									<div className="pt-4 border-t">
+										<h4 className="text-sm font-medium mb-3">Certificate Chain ({domain.certificates.length})</h4>
+										<div className="space-y-3">
+											{domain.certificates.map((cert, i) => (
+												<div key={i} className="rounded-lg border p-3 space-y-2">
+													<div className="flex items-center gap-2">
+														<Badge variant={i === 0 ? "default" : "secondary"} className="text-[10px]">
+															{i === 0 ? "Leaf" : i === domain.certificates!.length - 1 ? "Root" : "Intermediate"}
+														</Badge>
+														{cert.ca_provider && (
+															<Badge variant="outline" className="text-[10px]">{cert.ca_provider}</Badge>
+														)}
+													</div>
+													<div className="text-sm">
+														<p><span className="text-muted-foreground">Subject:</span> {cert.subject}</p>
+														<p><span className="text-muted-foreground">Issuer:</span> {cert.issuer}</p>
+													</div>
+													{cert.alt_names && cert.alt_names.length > 0 && (
+														<div>
+															<p className="text-xs text-muted-foreground mb-1">Subject Alternative Names ({cert.alt_names.length})</p>
+															<div className="flex flex-wrap gap-1">
+																{cert.alt_names.slice(0, 8).map((name, j) => (
+																	<code key={j} className="text-[10px] bg-muted px-1.5 py-0.5 rounded">{name}</code>
+																))}
+																{cert.alt_names.length > 8 && (
+																	<span className="text-[10px] text-muted-foreground">+{cert.alt_names.length - 8} more</span>
+																)}
+															</div>
+														</div>
+													)}
+													<div className="text-xs text-muted-foreground">
+														Valid: {formatDate(cert.valid_from)} → {formatDate(cert.valid_to)}
+													</div>
+												</div>
+											))}
+										</div>
+									</div>
+								)}
 							</>
 						) : (
 							<div className="text-center py-8">
@@ -787,13 +1021,13 @@ export default function DomainDetail({ id }: { id: string }) {
 							</div>
 						</div>
 
-						{/* Important Dates */}
+						{/* Important Dates & TLD */}
 						<div className="space-y-2 pt-4 border-t">
 							<h4 className="text-sm font-medium flex items-center gap-2">
 								<Calendar className="h-4 w-4" />
 								Important Dates
 							</h4>
-							<div className="grid sm:grid-cols-3 gap-4">
+							<div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
 								<div>
 									<p className="text-sm text-muted-foreground">Registration</p>
 									<p className="font-medium">{formatDate(domain.creation_date)}</p>
@@ -806,8 +1040,44 @@ export default function DomainDetail({ id }: { id: string }) {
 									<p className="text-sm text-muted-foreground">Expires</p>
 									<p className="font-medium">{formatDate(domain.expiry_date)}</p>
 								</div>
+								{domain.tld && (
+									<div>
+										<p className="text-sm text-muted-foreground">TLD</p>
+										<p className="font-medium">.{domain.tld}</p>
+									</div>
+								)}
 							</div>
 						</div>
+
+						{/* Privacy & Security */}
+						{(domain.privacy_enabled !== undefined || domain.transfer_lock !== undefined || domain.host_country_code) && (
+							<div className="space-y-2 pt-4 border-t">
+								<h4 className="text-sm font-medium flex items-center gap-2">
+									<Key className="h-4 w-4" />
+									Privacy & Security
+								</h4>
+								<div className="flex flex-wrap gap-2">
+									{domain.privacy_enabled !== undefined && (
+										<Badge variant={domain.privacy_enabled ? "default" : "secondary"} className="gap-1">
+											{domain.privacy_enabled ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+											{domain.privacy_enabled ? "Privacy Protected" : "Privacy Visible"}
+										</Badge>
+									)}
+									{domain.transfer_lock !== undefined && (
+										<Badge variant={domain.transfer_lock ? "default" : "secondary"} className="gap-1">
+											{domain.transfer_lock ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+											{domain.transfer_lock ? "Transfer Locked" : "Transfer Unlocked"}
+										</Badge>
+									)}
+									{domain.host_country_code && (
+										<Badge variant="outline" className="gap-1">
+											<MapPin className="h-3 w-3" />
+											{domain.host_country_code}
+										</Badge>
+									)}
+								</div>
+							</div>
+						)}
 
 						{/* Registrant Contact */}
 						{(domain.registrant_name || domain.registrant_org) && (
@@ -970,7 +1240,7 @@ export default function DomainDetail({ id }: { id: string }) {
 			</Card>
 			<DomainDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} domain={domain} isEdit />
 
-			<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+			<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete Domain</AlertDialogTitle>

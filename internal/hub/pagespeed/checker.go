@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -65,21 +66,21 @@ type PageSpeedResponse struct {
 
 // Metrics represents the extracted performance metrics
 type Metrics struct {
-	Performance     float64       `json:"performance"`
-	Accessibility   float64       `json:"accessibility"`
-	BestPractices   float64       `json:"bestPractices"`
-	SEO             float64       `json:"seo"`
-	PWA             float64       `json:"pwa"`
-	FCP             float64       `json:"fcp"`             // First Contentful Paint (ms)
-	LCP             float64       `json:"lcp"`             // Largest Contentful Paint (ms)
-	TTFB            float64       `json:"ttfb"`            // Time to First Byte (ms)
-	CLS             float64       `json:"cls"`             // Cumulative Layout Shift
-	TBT             float64       `json:"tbt"`             // Total Blocking Time (ms)
-	SpeedIndex      float64       `json:"speedIndex"`      // Speed Index (ms)
-	TTI             float64       `json:"tti"`             // Time to Interactive (ms)
-	CheckedAt       time.Time     `json:"checkedAt"`
-	URL             string        `json:"url"`
-	Strategy        string        `json:"strategy"` // mobile or desktop
+	Performance   float64   `json:"performance"`
+	Accessibility float64   `json:"accessibility"`
+	BestPractices float64   `json:"bestPractices"`
+	SEO           float64   `json:"seo"`
+	PWA           float64   `json:"pwa"`
+	FCP           float64   `json:"fcp"`        // First Contentful Paint (ms)
+	LCP           float64   `json:"lcp"`        // Largest Contentful Paint (ms)
+	TTFB          float64   `json:"ttfb"`       // Time to First Byte (ms)
+	CLS           float64   `json:"cls"`        // Cumulative Layout Shift
+	TBT           float64   `json:"tbt"`        // Total Blocking Time (ms)
+	SpeedIndex    float64   `json:"speedIndex"` // Speed Index (ms)
+	TTI           float64   `json:"tti"`        // Time to Interactive (ms)
+	CheckedAt     time.Time `json:"checkedAt"`
+	URL           string    `json:"url"`
+	Strategy      string    `json:"strategy"` // mobile or desktop
 }
 
 // Checker handles PageSpeed checks
@@ -99,7 +100,7 @@ func NewChecker(apiKey string) *Checker {
 }
 
 // CheckURL runs a PageSpeed check on a URL
-func (c *Checker) CheckURL(url string, strategy string) (*Metrics, error) {
+func (c *Checker) CheckURL(pageURL string, strategy string) (*Metrics, error) {
 	if strategy == "" {
 		strategy = "mobile"
 	}
@@ -107,7 +108,7 @@ func (c *Checker) CheckURL(url string, strategy string) (*Metrics, error) {
 	// Build PageSpeed API URL
 	apiURL := fmt.Sprintf(
 		"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=%s&strategy=%s&category=PERFORMANCE&category=ACCESSIBILITY&category=BEST_PRACTICES&category=SEO&category=PWA",
-		url,
+		url.QueryEscape(pageURL),
 		strategy,
 	)
 
@@ -132,7 +133,7 @@ func (c *Checker) CheckURL(url string, strategy string) (*Metrics, error) {
 	}
 
 	metrics := &Metrics{
-		URL:           url,
+		URL:           pageURL,
 		Strategy:      strategy,
 		CheckedAt:     time.Now(),
 		Performance:   result.LighthouseResult.Categories.Performance.Score * 100,
@@ -192,6 +193,7 @@ func GetCoreWebVitalsStatus(metrics *Metrics) map[string]string {
 		"cls":  getCLSStatus(metrics.CLS),
 		"fcp":  getFCPStatus(metrics.FCP),
 		"ttfb": getTTFBStatus(metrics.TTFB),
+		"tti":  getTTIStatus(metrics.TTI),
 	}
 }
 
@@ -235,6 +237,15 @@ func getTTFBStatus(value float64) string {
 	if value <= 800 {
 		return "good"
 	} else if value <= 1800 {
+		return "needs-improvement"
+	}
+	return "poor"
+}
+
+func getTTIStatus(value float64) string {
+	if value <= 3800 {
+		return "good"
+	} else if value <= 7300 {
 		return "needs-improvement"
 	}
 	return "poor"

@@ -32,7 +32,7 @@ func main() {
 		start := time.Now()
 
 		// Test WHOIS lookup
-		whoisData, err := lookupService.LookupWHOIS(ctx, domainName)
+		whoisData, _, err := lookupService.LookupWHOIS(ctx, domainName)
 
 		duration := time.Since(start)
 		fmt.Printf("Lookup duration: %v\n", duration)

@@ -121,6 +121,66 @@ export interface Domain {
 	dns_spf_records?: string[]
 	dns_dkim_records?: string[]
 	dns_dmarc_records?: string[]
+
+	// Provider Detection
+	dns_provider?: string
+	hosting_provider?: string
+	email_provider?: string
+	ca_provider?: string
+
+	// HTTP Headers
+	headers?: { name: string; value: string }[]
+
+	// Certificate Chain
+	certificates?: {
+		issuer: string
+		subject: string
+		alt_names: string[]
+		valid_from: string
+		valid_to: string
+		ca_provider: string
+	}[]
+
+	// SEO Metadata
+	seo_meta?: {
+		openGraph: {
+			url: string
+			type: string
+			title: string
+			images: string[]
+			description: string
+		}
+		twitter: {
+			title: string
+			description: string
+			image: string
+			card: string
+		}
+		general: {
+			title: string
+			author: string
+			robots: string
+			keywords: string
+			canonical: string
+			description: string
+		}
+		robots: {
+			fetched: boolean
+			groups: {
+				userAgents: string[]
+				rules: { type: string; value: string }[]
+			}[]
+			sitemaps: string[]
+		}
+	}
+
+	// Raw WHOIS & Registration Details
+	whois_raw?: string
+	privacy_enabled?: boolean
+	transfer_lock?: boolean
+	tld?: string
+	domain_statuses?: string[]
+	host_country_code?: string
 }
 
 export interface DomainHistory {
@@ -204,6 +264,66 @@ export interface DomainLookupResult {
 	host_isp?: string
 	favicon_url?: string
 	last_checked?: string
+
+	// Provider Detection
+	dns_provider?: string
+	hosting_provider?: string
+	email_provider?: string
+	ca_provider?: string
+
+	// HTTP Headers
+	headers?: { name: string; value: string }[]
+
+	// Certificate Chain
+	certificates?: {
+		issuer: string
+		subject: string
+		alt_names: string[]
+		valid_from: string
+		valid_to: string
+		ca_provider: string
+	}[]
+
+	// SEO Metadata
+	seo_meta?: {
+		openGraph: {
+			url: string
+			type: string
+			title: string
+			images: string[]
+			description: string
+		}
+		twitter: {
+			title: string
+			description: string
+			image: string
+			card: string
+		}
+		general: {
+			title: string
+			author: string
+			robots: string
+			keywords: string
+			canonical: string
+			description: string
+		}
+		robots: {
+			fetched: boolean
+			groups: {
+				userAgents: string[]
+				rules: { type: string; value: string }[]
+			}[]
+			sitemaps: string[]
+		}
+	}
+
+	// Raw WHOIS & Registration Details
+	whois_raw?: string
+	privacy_enabled?: boolean
+	transfer_lock?: boolean
+	tld?: string
+	domain_statuses?: string[]
+	host_country_code?: string
 }
 
 const API_BASE = "/api/beszel/domains"

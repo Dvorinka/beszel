@@ -440,6 +440,18 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 											{lookupData.host_country && (
 												<p className="text-sm">Location: {lookupData.host_country}</p>
 											)}
+											{lookupData.dns_provider && (
+												<p className="text-sm">DNS: {lookupData.dns_provider}</p>
+											)}
+											{lookupData.hosting_provider && (
+												<p className="text-sm">Hosting: {lookupData.hosting_provider}</p>
+											)}
+											{lookupData.email_provider && (
+												<p className="text-sm">Email: {lookupData.email_provider}</p>
+											)}
+											{lookupData.ca_provider && (
+												<p className="text-sm">CA: {lookupData.ca_provider}</p>
+											)}
 										</div>
 
 										{/* Manual expiry fallback when WHOIS doesn't return expiry */}

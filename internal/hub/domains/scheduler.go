@@ -262,9 +262,28 @@ func (s *Scheduler) checkDomain(record *core.Record) error {
 	if newData.AbuseEmail != "" {
 		record.Set("abuse_email", newData.AbuseEmail)
 	}
-	if newData.AbusePhone != "" {
-		record.Set("abuse_phone", newData.AbusePhone)
+	record.Set("abuse_phone", newData.AbusePhone)
+	record.Set("dns_provider", newData.DNSProvider)
+	record.Set("hosting_provider", newData.HostingProvider)
+	record.Set("email_provider", newData.EmailProvider)
+	record.Set("ca_provider", newData.CAProvider)
+	if len(newData.Headers) > 0 {
+		record.Set("headers", newData.Headers)
 	}
+	if len(newData.Certificates) > 0 {
+		record.Set("certificates", newData.Certificates)
+	}
+	if newData.SEOMeta != nil {
+		record.Set("seo_meta", newData.SEOMeta)
+	}
+	record.Set("whois_raw", newData.WHOISRaw)
+	record.Set("privacy_enabled", newData.PrivacyEnabled)
+	record.Set("transfer_lock", newData.TransferLock)
+	record.Set("tld", newData.TLD)
+	if len(newData.DomainStatuses) > 0 {
+		record.Set("domain_statuses", newData.DomainStatuses)
+	}
+	record.Set("host_country_code", newData.HostCountryCode)
 	record.Set("last_checked", time.Now())
 
 	// Update status - fallback to existing record expiry if new lookup didn't return one
@@ -418,6 +437,61 @@ func (s *Scheduler) trackChanges(oldRecord *core.Record, newData *domain.Domain,
 			FieldName:  "ssl_valid_to",
 			OldValue:   oldSSLExpiry.Format("2006-01-02"),
 			NewValue:   newData.SSLValidTo.Format("2006-01-02"),
+			CreatedAt:  now,
+		})
+	}
+
+	// Check provider changes
+	providers := []struct {
+		field string
+		value string
+	}{
+		{"dns_provider", newData.DNSProvider},
+		{"hosting_provider", newData.HostingProvider},
+		{"email_provider", newData.EmailProvider},
+		{"ca_provider", newData.CAProvider},
+	}
+	for _, p := range providers {
+		oldVal := oldRecord.GetString(p.field)
+		if p.value != "" && p.value != oldVal && oldVal != "" {
+			history = append(history, domain.DomainHistory{
+				ChangeType: domain.ChangeTypeProvider,
+				FieldName:  p.field,
+				OldValue:   oldVal,
+				NewValue:   p.value,
+				CreatedAt:  now,
+			})
+		}
+	}
+
+	// Check security changes
+	if newData.PrivacyEnabled != oldRecord.GetBool("privacy_enabled") {
+		history = append(history, domain.DomainHistory{
+			ChangeType: domain.ChangeTypeSecurity,
+			FieldName:  "privacy_enabled",
+			OldValue:   fmt.Sprintf("%t", oldRecord.GetBool("privacy_enabled")),
+			NewValue:   fmt.Sprintf("%t", newData.PrivacyEnabled),
+			CreatedAt:  now,
+		})
+	}
+	if newData.TransferLock != oldRecord.GetBool("transfer_lock") {
+		history = append(history, domain.DomainHistory{
+			ChangeType: domain.ChangeTypeSecurity,
+			FieldName:  "transfer_lock",
+			OldValue:   fmt.Sprintf("%t", oldRecord.GetBool("transfer_lock")),
+			NewValue:   fmt.Sprintf("%t", newData.TransferLock),
+			CreatedAt:  now,
+		})
+	}
+
+	// Check host country code change
+	oldCountryCode := oldRecord.GetString("host_country_code")
+	if newData.HostCountryCode != "" && newData.HostCountryCode != oldCountryCode && oldCountryCode != "" {
+		history = append(history, domain.DomainHistory{
+			ChangeType: domain.ChangeTypeHost,
+			FieldName:  "host_country_code",
+			OldValue:   oldCountryCode,
+			NewValue:   newData.HostCountryCode,
 			CreatedAt:  now,
 		})
 	}

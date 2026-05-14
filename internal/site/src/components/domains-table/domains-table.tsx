@@ -49,7 +49,6 @@ import {
 	getDomainSubdomains,
 	formatDate,
 	type Domain,
-	type Subdomain,
 } from "@/lib/domains"
 import {
 	MoreHorizontal,
@@ -76,6 +75,7 @@ type DisplayOptions = {
 	showRegistrar: boolean
 	showExpiryDate: boolean
 	showTags: boolean
+	showProviders: boolean
 }
 
 // Days left badge component - big and visible
@@ -155,7 +155,7 @@ export default function DomainsTable() {
 	
 	const [displayOptions, setDisplayOptions] = useBrowserStorage<DisplayOptions>(
 		"domainsDisplayOptions",
-		{ showSSL: true, showRegistrar: true, showExpiryDate: true, showTags: true }
+		{ showSSL: true, showRegistrar: true, showExpiryDate: true, showTags: true, showProviders: false }
 	)
 
 	const { data: domains = [], isLoading } = useQuery({
@@ -463,6 +463,12 @@ function StatusIndicator({ status }: { status: string }) {
 								>
 									Tags
 								</DropdownMenuCheckboxItem>
+								<DropdownMenuCheckboxItem
+									checked={displayOptions.showProviders}
+									onCheckedChange={(checked: boolean) => setDisplayOptions({ ...displayOptions, showProviders: checked })}
+								>
+									Providers
+								</DropdownMenuCheckboxItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
 					</div>
@@ -496,6 +502,7 @@ function StatusIndicator({ status }: { status: string }) {
 										{displayOptions.showRegistrar && <TableHead>Registrar</TableHead>}
 										{displayOptions.showSSL && <TableHead>SSL Expiry</TableHead>}
 										{displayOptions.showTags && <TableHead>Tags</TableHead>}
+										{displayOptions.showProviders && <TableHead>Providers</TableHead>}
 										<TableHead className="w-[100px]">Actions</TableHead>
 									</TableRow>
 									</TableHeader>
@@ -551,6 +558,16 @@ function StatusIndicator({ status }: { status: string }) {
 																	{tag}
 																</span>
 															))}
+														</div>
+													</TableCell>
+												)}
+												{displayOptions.showProviders && (
+													<TableCell>
+														<div className="flex flex-col gap-0.5 text-xs">
+															{domain.dns_provider && <span className="text-muted-foreground">DNS: <span className="text-foreground">{domain.dns_provider}</span></span>}
+															{domain.hosting_provider && <span className="text-muted-foreground">Host: <span className="text-foreground">{domain.hosting_provider}</span></span>}
+															{domain.email_provider && <span className="text-muted-foreground">Email: <span className="text-foreground">{domain.email_provider}</span></span>}
+															{domain.ca_provider && <span className="text-muted-foreground">CA: <span className="text-foreground">{domain.ca_provider}</span></span>}
 														</div>
 													</TableCell>
 												)}
@@ -659,6 +676,14 @@ function StatusIndicator({ status }: { status: string }) {
 													<span className="text-xs text-muted-foreground truncate max-w-[120px]">{domain.registrar_name || "Unknown"}</span>
 												)}
 											</div>
+											{displayOptions.showProviders && (
+												<div className="flex flex-wrap gap-1 text-[10px]">
+													{domain.dns_provider && <span className="text-muted-foreground">DNS: <span className="text-foreground">{domain.dns_provider}</span></span>}
+													{domain.hosting_provider && <span className="text-muted-foreground">Host: <span className="text-foreground">{domain.hosting_provider}</span></span>}
+													{domain.email_provider && <span className="text-muted-foreground">Email: <span className="text-foreground">{domain.email_provider}</span></span>}
+													{domain.ca_provider && <span className="text-muted-foreground">CA: <span className="text-foreground">{domain.ca_provider}</span></span>}
+												</div>
+											)}
 											<div className="flex gap-2">
 												<DaysLeftBadge days={domain.days_until_expiry} />
 												{displayOptions.showSSL && domain.ssl_valid_to && (

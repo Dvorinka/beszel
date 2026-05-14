@@ -71,6 +71,33 @@ type Domain struct {
 	AbuseEmail string `json:"abuse_email" db:"abuse_email"`
 	AbusePhone string `json:"abuse_phone" db:"abuse_phone"`
 
+	// Provider Detection
+	DNSProvider     string `json:"dns_provider" db:"dns_provider"`
+	HostingProvider string `json:"hosting_provider" db:"hosting_provider"`
+	EmailProvider   string `json:"email_provider" db:"email_provider"`
+	CAProvider      string `json:"ca_provider" db:"ca_provider"`
+
+	// HTTP Headers
+	Headers []Header `json:"headers" db:"headers"`
+
+	// Certificate Chain
+	Certificates []Certificate `json:"certificates" db:"certificates"`
+
+	// SEO Metadata
+	SEOMeta *SEOMeta `json:"seo_meta" db:"seo_meta"`
+
+	// Raw WHOIS Response
+	WHOISRaw string `json:"whois_raw" db:"whois_raw"`
+
+	// Registration Details
+	PrivacyEnabled bool     `json:"privacy_enabled" db:"privacy_enabled"`
+	TransferLock   bool     `json:"transfer_lock" db:"transfer_lock"`
+	TLD            string   `json:"tld" db:"tld"`
+	DomainStatuses []string `json:"domain_statuses" db:"domain_statuses"`
+
+	// Enhanced Geo
+	HostCountryCode string `json:"host_country_code" db:"host_country_code"`
+
 	// Metadata
 	Tags       []string `json:"tags" db:"tags"`
 	Notes      string   `json:"notes" db:"notes"`
@@ -176,6 +203,76 @@ type IPInfo struct {
 	IPv6 []string `json:"ipv6"`
 }
 
+// Header represents an HTTP response header
+type Header struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// Certificate represents a TLS certificate in the chain
+type Certificate struct {
+	Issuer     string    `json:"issuer"`
+	Subject    string    `json:"subject"`
+	AltNames   []string  `json:"alt_names"`
+	ValidFrom  time.Time `json:"valid_from"`
+	ValidTo    time.Time `json:"valid_to"`
+	CAProvider string    `json:"ca_provider"`
+}
+
+// OpenGraphMeta represents Open Graph metadata
+type OpenGraphMeta struct {
+	URL         string   `json:"url"`
+	Type        string   `json:"type"`
+	Title       string   `json:"title"`
+	Images      []string `json:"images"`
+	Description string   `json:"description"`
+}
+
+// TwitterMeta represents Twitter card metadata
+type TwitterMeta struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Image       string `json:"image"`
+	Card        string `json:"card"`
+}
+
+// GeneralMeta represents general HTML meta tags
+type GeneralMeta struct {
+	Title       string `json:"title"`
+	Author      string `json:"author"`
+	Robots      string `json:"robots"`
+	Keywords    string `json:"keywords"`
+	Canonical   string `json:"canonical"`
+	Description string `json:"description"`
+}
+
+// RobotsTxt represents parsed robots.txt data
+type RobotsTxt struct {
+	Fetched  bool          `json:"fetched"`
+	Groups   []RobotsGroup `json:"groups"`
+	Sitemaps []string      `json:"sitemaps"`
+}
+
+// RobotsGroup represents a user-agent group in robots.txt
+type RobotsGroup struct {
+	UserAgents []string     `json:"userAgents"`
+	Rules      []RobotsRule `json:"rules"`
+}
+
+// RobotsRule represents a single rule in robots.txt
+type RobotsRule struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+// SEOMeta represents all SEO-related metadata
+type SEOMeta struct {
+	OpenGraph OpenGraphMeta `json:"openGraph"`
+	Twitter   TwitterMeta   `json:"twitter"`
+	General   GeneralMeta   `json:"general"`
+	Robots    RobotsTxt     `json:"robots"`
+}
+
 // ChangeType constants for domain history
 const (
 	ChangeTypeExpiry    = "expiry"
@@ -185,6 +282,9 @@ const (
 	ChangeTypeIP        = "ip"
 	ChangeTypeHost      = "host"
 	ChangeTypeStatus    = "status"
+	ChangeTypeProvider  = "provider"
+	ChangeTypeSecurity  = "security"
+	ChangeTypeSEO       = "seo"
 )
 
 // Domain status constants

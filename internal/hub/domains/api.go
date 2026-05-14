@@ -635,6 +635,19 @@ func (h *APIHandler) recordToResponse(record *core.Record) map[string]interface{
 		"registrant_state":           record.GetString("registrant_state"),
 		"abuse_email":                record.GetString("abuse_email"),
 		"abuse_phone":                record.GetString("abuse_phone"),
+		"dns_provider":               record.GetString("dns_provider"),
+		"hosting_provider":           record.GetString("hosting_provider"),
+		"email_provider":             record.GetString("email_provider"),
+		"ca_provider":                record.GetString("ca_provider"),
+		"headers":                    record.Get("headers"),
+		"certificates":               record.Get("certificates"),
+		"seo_meta":                   record.Get("seo_meta"),
+		"whois_raw":                  record.GetString("whois_raw"),
+		"privacy_enabled":            record.GetBool("privacy_enabled"),
+		"transfer_lock":              record.GetBool("transfer_lock"),
+		"tld":                        record.GetString("tld"),
+		"domain_statuses":            record.Get("domain_statuses"),
+		"host_country_code":          record.GetString("host_country_code"),
 		"tags":                       record.Get("tags"),
 		"notes":                      record.GetString("notes"),
 		"favicon_url":                record.GetString("favicon_url"),
@@ -717,6 +730,27 @@ func (h *APIHandler) applyLookupData(record *core.Record, domainData *domain.Dom
 	record.Set("registrant_postal", domainData.RegistrantPostal)
 	record.Set("abuse_email", domainData.AbuseEmail)
 	record.Set("abuse_phone", domainData.AbusePhone)
+	record.Set("dns_provider", domainData.DNSProvider)
+	record.Set("hosting_provider", domainData.HostingProvider)
+	record.Set("email_provider", domainData.EmailProvider)
+	record.Set("ca_provider", domainData.CAProvider)
+	if len(domainData.Headers) > 0 {
+		record.Set("headers", domainData.Headers)
+	}
+	if len(domainData.Certificates) > 0 {
+		record.Set("certificates", domainData.Certificates)
+	}
+	if domainData.SEOMeta != nil {
+		record.Set("seo_meta", domainData.SEOMeta)
+	}
+	record.Set("whois_raw", domainData.WHOISRaw)
+	record.Set("privacy_enabled", domainData.PrivacyEnabled)
+	record.Set("transfer_lock", domainData.TransferLock)
+	record.Set("tld", domainData.TLD)
+	if len(domainData.DomainStatuses) > 0 {
+		record.Set("domain_statuses", domainData.DomainStatuses)
+	}
+	record.Set("host_country_code", domainData.HostCountryCode)
 	record.Set("favicon_url", domainData.FaviconURL)
 	record.Set("last_checked", time.Now())
 }

@@ -197,6 +197,25 @@ export interface CheckResult {
 	time?: string
 }
 
+export interface PageSpeedMetrics {
+	performance: number
+	accessibility: number
+	bestPractices: number
+	seo: number
+	pwa: number
+	fcp: number
+	lcp: number
+	ttfb: number
+	cls: number
+	tbt: number
+	speedIndex: number
+	tti: number
+	strategy: string
+	checkedAt: string
+	url: string
+	vitals: Record<string, string>
+}
+
 // API Functions
 export async function listMonitors(): Promise<Monitor[]> {
 	const response = await pb.send<{ monitors: Monitor[] }>("/api/beszel/monitors", {})
@@ -259,6 +278,12 @@ export function getMonitorStats(id: string): Promise<{
 
 export function getMonitorHeartbeats(id: string): Promise<{ heartbeats: Heartbeat[] }> {
 	return pb.send(`/api/beszel/monitors/${id}/heartbeats`, {})
+}
+
+export function runPageSpeedCheck(id: string, strategy: string = "mobile"): Promise<PageSpeedMetrics> {
+	return pb.send(`/api/beszel/monitors/${id}/pagespeed?strategy=${strategy}`, {
+		method: "POST",
+	})
 }
 
 // Helper functions

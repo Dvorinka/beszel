@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/henrygd/beszel/internal/entities/domain"
+	"github.com/henrygd/beszel/internal/hub/domains/detect"
 )
 
 // LookupService handles WHOIS lookups with multiple fallback methods
@@ -34,14 +35,22 @@ func NewLookupService(apiKey string) *LookupService {
 	}
 }
 
-// LookupDomain performs a comprehensive domain lookup (WHOIS, DNS, SSL, Host)
+// LookupDomain performs a comprehensive domain lookup (WHOIS, DNS, SSL, Host, Headers, SEO)
 func (s *LookupService) LookupDomain(ctx context.Context, domainName string) (*domain.Domain, error) {
 	// Clean domain name
 	domainName = cleanDomain(domainName)
 
+	// Extract TLD
+	parts := strings.Split(domainName, ".")
+	tld := ""
+	if len(parts) >= 2 {
+		tld = strings.ToLower(parts[len(parts)-1])
+	}
+
 	// Initialize domain struct
 	d := &domain.Domain{
 		DomainName:      domainName,
+		TLD:             tld,
 		Active:          true,
 		AlertDaysBefore: 30, // Default: alert 30 days before expiry
 		Tags:            []string{},
@@ -50,24 +59,37 @@ func (s *LookupService) LookupDomain(ctx context.Context, domainName string) (*d
 		TXTRecords:      []string{},
 		IPv4Addresses:   []string{},
 		IPv6Addresses:   []string{},
+		Headers:         []domain.Header{},
+		Certificates:    []domain.Certificate{},
+		DomainStatuses:  []string{},
 	}
 
 	// Perform WHOIS lookup
-	whoisData, err := s.LookupWHOIS(ctx, domainName)
+	whoisData, rawWhois, err := s.LookupWHOIS(ctx, domainName)
 	if err == nil && whoisData != nil {
 		s.applyWHOISData(d, whoisData)
+		d.WHOISRaw = rawWhois
 	}
 
 	// Perform DNS lookups
 	s.lookupDNS(ctx, domainName, d)
 
-	// Perform SSL lookup
-	s.lookupSSL(ctx, domainName, d)
+	// Perform SSL lookup (certificate chain)
+	s.lookupCertificateChain(ctx, domainName, d)
 
 	// Perform host lookup (using first IPv4)
 	if len(d.IPv4Addresses) > 0 {
 		s.lookupHost(d.IPv4Addresses[0], d)
 	}
+
+	// Fetch HTTP headers for provider detection
+	s.lookupHeaders(ctx, domainName, d)
+
+	// Fetch SEO metadata
+	s.lookupSEO(ctx, domainName, d)
+
+	// Detect providers from gathered data
+	s.detectProviders(d)
 
 	// Fetch favicon
 	d.FaviconURL = fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=128", domainName)
@@ -77,31 +99,31 @@ func (s *LookupService) LookupDomain(ctx context.Context, domainName string) (*d
 }
 
 // LookupWHOIS performs WHOIS lookup with multiple fallback methods
-func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, error) {
+func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, string, error) {
 	var lastErr error
 
 	// Try RDAP first
 	data, err := s.tryRDAP(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
-		return data, nil
+		return data, "", nil
 	}
 	if err != nil {
 		lastErr = err
 	}
 
 	// Try TCP WHOIS (this should work for .eu domains)
-	data, err = s.tryTCPWHOIS(ctx, domainName)
+	data, raw, err := s.tryTCPWHOIS(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
-		return data, nil
+		return data, raw, nil
 	}
 	if err != nil {
 		lastErr = err
 	}
 
 	// Try native whois command (often works when TCP fails)
-	data, err = s.tryNativeWHOIS(ctx, domainName)
+	data, raw, err = s.tryNativeWHOIS(ctx, domainName)
 	if err == nil && data != nil && hasValidData(data) {
-		return data, nil
+		return data, raw, nil
 	}
 	if err != nil {
 		lastErr = err
@@ -112,7 +134,7 @@ func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*do
 	if len(parts) >= 2 && strings.ToLower(parts[len(parts)-1]) == "eu" {
 		data, err = s.tryEURidWebScraping(ctx, domainName)
 		if err == nil && data != nil && hasValidData(data) {
-			return data, nil
+			return data, "", nil
 		}
 		if err != nil {
 			lastErr = err
@@ -121,7 +143,7 @@ func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*do
 		// Try alternative WHOIS services for .eu domains
 		data, err = s.tryAlternativeWHOIS(ctx, domainName)
 		if err == nil && data != nil && hasValidData(data) {
-			return data, nil
+			return data, "", nil
 		}
 		if err != nil {
 			lastErr = err
@@ -132,11 +154,11 @@ func (s *LookupService) LookupWHOIS(ctx context.Context, domainName string) (*do
 	if s.whoisXMLAPIKey != "" {
 		data, err = s.tryWhoisXML(ctx, domainName)
 		if err == nil && data != nil {
-			return data, nil
+			return data, "", nil
 		}
 	}
 
-	return nil, fmt.Errorf("all WHOIS lookup methods failed for %s: %w", domainName, lastErr)
+	return nil, "", fmt.Errorf("all WHOIS lookup methods failed for %s: %w", domainName, lastErr)
 }
 
 // tryRDAP attempts RDAP lookup
@@ -268,11 +290,11 @@ func (s *LookupService) tryRDAP(ctx context.Context, domainName string) (*domain
 }
 
 // tryNativeWHOIS tries the native whois command
-func (s *LookupService) tryNativeWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, error) {
+func (s *LookupService) tryNativeWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, string, error) {
 	// Check if whois command exists
 	_, err := exec.LookPath("whois")
 	if err != nil {
-		return nil, fmt.Errorf("whois command not found")
+		return nil, "", fmt.Errorf("whois command not found")
 	}
 
 	// Use longer timeout for .eu domains
@@ -289,10 +311,12 @@ func (s *LookupService) tryNativeWHOIS(ctx context.Context, domainName string) (
 	cmd := exec.CommandContext(cmdCtx, "whois", domainName)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return s.parseWHOISOutput(string(output), domainName)
+	outStr := string(output)
+	data, err := s.parseWHOISOutput(outStr, domainName)
+	return data, outStr, err
 }
 
 // whoisServers maps common TLDs to their WHOIS servers
@@ -328,10 +352,10 @@ var whoisServers = map[string]string{
 }
 
 // tryTCPWHOIS performs WHOIS lookup via direct TCP connection (port 43)
-func (s *LookupService) tryTCPWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, error) {
+func (s *LookupService) tryTCPWHOIS(ctx context.Context, domainName string) (*domain.WHOISData, string, error) {
 	parts := strings.Split(domainName, ".")
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid domain format")
+		return nil, "", fmt.Errorf("invalid domain format")
 	}
 	tld := strings.ToLower(parts[len(parts)-1])
 
@@ -352,19 +376,19 @@ func (s *LookupService) tryTCPWHOIS(ctx context.Context, domainName string) (*do
 	dialer := &net.Dialer{Timeout: timeout}
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("tcp whois dial failed: %w", err)
+		return nil, "", fmt.Errorf("tcp whois dial failed: %w", err)
 	}
 	defer conn.Close()
 
 	// Some servers require the domain followed by \r\n
 	query := domainName + "\r\n"
 	if _, err := conn.Write([]byte(query)); err != nil {
-		return nil, fmt.Errorf("tcp whois write failed: %w", err)
+		return nil, "", fmt.Errorf("tcp whois write failed: %w", err)
 	}
 
 	// Read response with deadline
 	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var output strings.Builder
@@ -379,7 +403,8 @@ func (s *LookupService) tryTCPWHOIS(ctx context.Context, domainName string) (*do
 		}
 	}
 
-	return s.parseWHOISOutput(output.String(), domainName)
+	data, err := s.parseWHOISOutput(output.String(), domainName)
+	return data, output.String(), err
 }
 
 // tryWhoisXML tries the WhoisXML API
@@ -1251,7 +1276,7 @@ func splitHex(value string) []string {
 // lookupHost fetches host/geolocation info
 func (s *LookupService) lookupHost(ip string, d *domain.Domain) {
 	// Use ip-api.com (free, no auth required for non-commercial use)
-	url := fmt.Sprintf("http://ip-api.com/json/%s?fields=status,message,country,regionName,city,lat,lon,isp,org,as", ip)
+	url := fmt.Sprintf("http://ip-api.com/json/%s?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as", ip)
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get(url)
@@ -1261,16 +1286,17 @@ func (s *LookupService) lookupHost(ip string, d *domain.Domain) {
 	defer resp.Body.Close()
 
 	var result struct {
-		Status  string  `json:"status"`
-		Message string  `json:"message"`
-		Country string  `json:"country"`
-		Region  string  `json:"regionName"`
-		City    string  `json:"city"`
-		Lat     float64 `json:"lat"`
-		Lon     float64 `json:"lon"`
-		ISP     string  `json:"isp"`
-		Org     string  `json:"org"`
-		AS      string  `json:"as"`
+		Status      string  `json:"status"`
+		Message     string  `json:"message"`
+		Country     string  `json:"country"`
+		CountryCode string  `json:"countryCode"`
+		Region      string  `json:"regionName"`
+		City        string  `json:"city"`
+		Lat         float64 `json:"lat"`
+		Lon         float64 `json:"lon"`
+		ISP         string  `json:"isp"`
+		Org         string  `json:"org"`
+		AS          string  `json:"as"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -1279,6 +1305,7 @@ func (s *LookupService) lookupHost(ip string, d *domain.Domain) {
 
 	if result.Status == "success" {
 		d.HostCountry = result.Country
+		d.HostCountryCode = result.CountryCode
 		d.HostRegion = result.Region
 		d.HostCity = result.City
 		d.HostLat = result.Lat
@@ -1301,6 +1328,27 @@ func (s *LookupService) applyWHOISData(d *domain.Domain, whois *domain.WHOISData
 	d.RegistrarID = whois.Registrar.ID
 	d.RegistrarURL = whois.Registrar.URL
 	d.RegistryDomainID = whois.Registrar.RegistryDomainID
+	d.DomainStatuses = whois.Status
+
+	// Detect privacy protection from registrant name
+	registrantLower := strings.ToLower(whois.Registrant.Name + " " + whois.Registrant.Organization)
+	d.PrivacyEnabled = strings.Contains(registrantLower, "redacted") ||
+		strings.Contains(registrantLower, "privacy") ||
+		strings.Contains(registrantLower, "whoisguard") ||
+		strings.Contains(registrantLower, "not disclosed") ||
+		strings.Contains(registrantLower, "hidden") ||
+		strings.Contains(registrantLower, "data protected") ||
+		strings.Contains(registrantLower, "gdpr") ||
+		strings.Contains(registrantLower, "data redacted")
+
+	// Detect transfer lock from statuses
+	for _, status := range whois.Status {
+		statusLower := strings.ToLower(status)
+		if strings.Contains(statusLower, "clienttransferprohibited") || strings.Contains(statusLower, "servertransferprohibited") {
+			d.TransferLock = true
+			break
+		}
+	}
 
 	// Apply registrant contact info if available
 	if whois.Registrant.Name != "" || whois.Registrant.Organization != "" {
@@ -1335,6 +1383,330 @@ func cleanDomain(domain string) string {
 		domain = domain[:idx]
 	}
 	return strings.ToLower(strings.TrimSpace(domain))
+}
+
+// lookupCertificateChain fetches the full TLS certificate chain
+func (s *LookupService) lookupCertificateChain(ctx context.Context, domainName string, d *domain.Domain) {
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", domainName+":443", &tls.Config{
+		ServerName:         domainName,
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	certs := conn.ConnectionState().PeerCertificates
+	for i, cert := range certs {
+		issuer := ""
+		if len(cert.Issuer.Organization) > 0 {
+			issuer = cert.Issuer.Organization[0]
+		} else if cert.Issuer.CommonName != "" {
+			issuer = cert.Issuer.CommonName
+		}
+
+		altNames := make([]string, 0, len(cert.DNSNames)+len(cert.IPAddresses)+len(cert.EmailAddresses))
+		altNames = append(altNames, cert.DNSNames...)
+		for _, ip := range cert.IPAddresses {
+			altNames = append(altNames, ip.String())
+		}
+		for _, email := range cert.EmailAddresses {
+			altNames = append(altNames, email)
+		}
+
+		// For leaf cert, also set legacy SSL fields
+		if i == 0 {
+			if len(cert.Issuer.Organization) > 0 {
+				d.SSLIssuer = cert.Issuer.Organization[0]
+			}
+			if len(cert.Issuer.Country) > 0 {
+				d.SSLIssuerCountry = cert.Issuer.Country[0]
+			}
+			d.SSLValidFrom = &cert.NotBefore
+			d.SSLValidTo = &cert.NotAfter
+			d.SSLSubject = cert.Subject.CommonName
+
+			fingerprint := sha256.Sum256(cert.Raw)
+			d.SSLFingerprint = strings.ToUpper(strings.Join(splitHex(hex.EncodeToString(fingerprint[:])), ":"))
+
+			d.SSLSignatureAlgo = cert.SignatureAlgorithm.String()
+
+			switch key := cert.PublicKey.(type) {
+			case *rsa.PublicKey:
+				d.SSLKeySize = key.N.BitLen()
+			case *ecdsa.PublicKey:
+				d.SSLKeySize = key.Curve.Params().BitSize
+			default:
+				d.SSLKeySize = 0
+			}
+		}
+
+		caProvider := detect.DetectCertificateAuthority(issuer)
+		d.Certificates = append(d.Certificates, domain.Certificate{
+			Issuer:     issuer,
+			Subject:    cert.Subject.CommonName,
+			AltNames:   altNames,
+			ValidFrom:  cert.NotBefore,
+			ValidTo:    cert.NotAfter,
+			CAProvider: caProvider,
+		})
+	}
+
+	// Set top-level CA provider from the chain
+	if len(d.Certificates) > 0 {
+		d.CAProvider = d.Certificates[len(d.Certificates)-1].CAProvider
+	}
+}
+
+// lookupHeaders fetches HTTP response headers
+func (s *LookupService) lookupHeaders(ctx context.Context, domainName string, d *domain.Domain) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
+	}
+
+	url := "https://" + domainName
+	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Beszel/1.0; +https://github.com/henrygd/beszel)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		// Try HTTP fallback
+		req, err = http.NewRequestWithContext(ctx, "HEAD", "http://"+domainName, nil)
+		if err != nil {
+			return
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Beszel/1.0; +https://github.com/henrygd/beszel)")
+		resp, err = client.Do(req)
+		if err != nil {
+			return
+		}
+	}
+	defer resp.Body.Close()
+
+	for name, values := range resp.Header {
+		for _, value := range values {
+			d.Headers = append(d.Headers, domain.Header{
+				Name:  strings.ToLower(name),
+				Value: value,
+			})
+		}
+	}
+}
+
+// lookupSEO fetches and parses SEO metadata
+func (s *LookupService) lookupSEO(ctx context.Context, domainName string, d *domain.Domain) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
+	}
+
+	// Fetch HTML
+	url := "https://" + domainName
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	// Limit reading to avoid large responses
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	if err != nil {
+		return
+	}
+
+	html := string(body)
+	seo := &domain.SEOMeta{
+		OpenGraph: domain.OpenGraphMeta{},
+		Twitter:   domain.TwitterMeta{},
+		General:   domain.GeneralMeta{},
+		Robots:    domain.RobotsTxt{Fetched: false, Groups: []domain.RobotsGroup{}, Sitemaps: []string{}},
+	}
+
+	// Parse general meta tags
+	seo.General.Title = extractMetaTag(html, "title")
+	seo.General.Description = extractMetaTag(html, "description")
+	seo.General.Author = extractMetaTag(html, "author")
+	seo.General.Robots = extractMetaTag(html, "robots")
+	seo.General.Keywords = extractMetaTag(html, "keywords")
+	seo.General.Canonical = extractLinkRel(html, "canonical")
+
+	// Parse Open Graph
+	seo.OpenGraph.URL = extractMetaProperty(html, "og:url")
+	seo.OpenGraph.Type = extractMetaProperty(html, "og:type")
+	seo.OpenGraph.Title = extractMetaProperty(html, "og:title")
+	seo.OpenGraph.Description = extractMetaProperty(html, "og:description")
+	seo.OpenGraph.Images = extractMetaProperties(html, "og:image")
+
+	// Parse Twitter
+	seo.Twitter.Title = extractMetaProperty(html, "twitter:title")
+	seo.Twitter.Description = extractMetaProperty(html, "twitter:description")
+	seo.Twitter.Image = extractMetaProperty(html, "twitter:image")
+	seo.Twitter.Card = extractMetaProperty(html, "twitter:card")
+
+	// Fetch robots.txt
+	robotsURL := url + "/robots.txt"
+	robotsReq, err := http.NewRequestWithContext(ctx, "GET", robotsURL, nil)
+	if err == nil {
+		robotsResp, err := client.Do(robotsReq)
+		if err == nil && robotsResp.StatusCode >= 200 && robotsResp.StatusCode < 300 {
+			robotsBody, err := io.ReadAll(io.LimitReader(robotsResp.Body, 256*1024))
+			robotsResp.Body.Close()
+			if err == nil {
+				seo.Robots = parseRobotsTxt(string(robotsBody))
+			}
+		} else if robotsResp != nil {
+			robotsResp.Body.Close()
+		}
+	}
+
+	d.SEOMeta = seo
+}
+
+// extractMetaTag extracts a meta tag by name attribute
+func extractMetaTag(html, name string) string {
+	// Match <meta name="xxx" content="yyy"> or <meta name='xxx' content='yyy'>
+	re := regexp.MustCompile(`(?i)<meta\s+name=["']` + regexp.QuoteMeta(name) + `["']\s+content=["']([^"']*)["']`)
+	match := re.FindStringSubmatch(html)
+	if len(match) > 1 {
+		return match[1]
+	}
+	// Try reverse order
+	re = regexp.MustCompile(`(?i)<meta\s+content=["']([^"']*)["']\s+name=["']` + regexp.QuoteMeta(name) + `["']`)
+	match = re.FindStringSubmatch(html)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+// extractMetaProperty extracts a meta tag by property attribute
+func extractMetaProperty(html, prop string) string {
+	re := regexp.MustCompile(`(?i)<meta\s+property=["']` + regexp.QuoteMeta(prop) + `["']\s+content=["']([^"']*)["']`)
+	match := re.FindStringSubmatch(html)
+	if len(match) > 1 {
+		return match[1]
+	}
+	// Try reverse order
+	re = regexp.MustCompile(`(?i)<meta\s+content=["']([^"']*)["']\s+property=["']` + regexp.QuoteMeta(prop) + `["']`)
+	match = re.FindStringSubmatch(html)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+// extractMetaProperties extracts all meta tags matching a property prefix
+func extractMetaProperties(html, prop string) []string {
+	re := regexp.MustCompile(`(?i)<meta\s+property=["']` + regexp.QuoteMeta(prop) + `["']\s+content=["']([^"']*)["']`)
+	matches := re.FindAllStringSubmatch(html, -1)
+	var results []string
+	for _, match := range matches {
+		if len(match) > 1 {
+			results = append(results, match[1])
+		}
+	}
+	return results
+}
+
+// extractLinkRel extracts a link rel href value
+func extractLinkRel(html, rel string) string {
+	re := regexp.MustCompile(`(?i)<link\s+rel=["']` + regexp.QuoteMeta(rel) + `["']\s+href=["']([^"']*)["']`)
+	match := re.FindStringSubmatch(html)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+// parseRobotsTxt parses robots.txt content
+func parseRobotsTxt(content string) domain.RobotsTxt {
+	result := domain.RobotsTxt{
+		Fetched:  true,
+		Groups:   []domain.RobotsGroup{},
+		Sitemaps: []string{},
+	}
+
+	lines := strings.Split(content, "\n")
+	var currentGroup *domain.RobotsGroup
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		key := strings.TrimSpace(strings.ToLower(parts[0]))
+		value := strings.TrimSpace(parts[1])
+
+		switch key {
+		case "user-agent":
+			if currentGroup != nil {
+				result.Groups = append(result.Groups, *currentGroup)
+			}
+			currentGroup = &domain.RobotsGroup{
+				UserAgents: []string{value},
+				Rules:      []domain.RobotsRule{},
+			}
+		case "allow", "disallow":
+			if currentGroup == nil {
+				currentGroup = &domain.RobotsGroup{
+					UserAgents: []string{"*"},
+					Rules:      []domain.RobotsRule{},
+				}
+			}
+			currentGroup.Rules = append(currentGroup.Rules, domain.RobotsRule{
+				Type:  key,
+				Value: value,
+			})
+		case "sitemap":
+			result.Sitemaps = append(result.Sitemaps, value)
+		}
+	}
+
+	if currentGroup != nil {
+		result.Groups = append(result.Groups, *currentGroup)
+	}
+
+	return result
+}
+
+// detectProviders detects DNS, hosting, email, and CA providers
+func (s *LookupService) detectProviders(d *domain.Domain) {
+	d.DNSProvider = detect.DetectDNSProvider(d.NameServers)
+	d.EmailProvider = detect.DetectEmailProvider(d.MXRecords)
+
+	if len(d.Headers) > 0 {
+		headerMap := make(http.Header)
+		for _, h := range d.Headers {
+			headerMap.Add(h.Name, h.Value)
+		}
+		d.HostingProvider = detect.DetectHostingProvider(headerMap)
+	}
 }
 
 // hasValidData checks if WHOIS data has useful parsed fields
