@@ -22,13 +22,7 @@ import {
 } from "lucide-react"
 import { memo, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -40,20 +34,8 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table"
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/components/ui/use-toast"
 import {
 	deleteMonitor,
@@ -193,10 +175,7 @@ function MonitorCard({
 							<Edit3Icon className="mr-2 h-4 w-4" />
 							Edit
 						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={() => deleteMutation.mutate(monitor.id)}
-							className="text-destructive"
-						>
+						<DropdownMenuItem onClick={() => deleteMutation.mutate(monitor.id)} className="text-destructive">
 							<Trash2Icon className="mr-2 h-4 w-4" />
 							Delete
 						</DropdownMenuItem>
@@ -211,7 +190,7 @@ function MonitorCard({
 						{getMonitorTypeLabel(monitor.type)}
 					</div>
 				</div>
-				
+
 				{/* Uptime - Prominent pill display */}
 				{displayOptions.showUptimePills && (
 					<div className="flex flex-col gap-2">
@@ -219,16 +198,16 @@ function MonitorCard({
 							{displayOptions.showUptimePercentage && (
 								<UptimePill uptime={monitor.uptime_stats?.uptime_24h ?? 100} label="24h" />
 							)}
-							{displayOptions.showUptimePercentage && monitor.uptime_stats?.uptime_7d !== undefined && monitor.uptime_stats.uptime_7d !== monitor.uptime_stats?.uptime_24h && (
-								<UptimePill uptime={monitor.uptime_stats.uptime_7d} label="7d" />
-							)}
+							{displayOptions.showUptimePercentage &&
+								monitor.uptime_stats?.uptime_7d !== undefined &&
+								monitor.uptime_stats.uptime_7d !== monitor.uptime_stats?.uptime_24h && (
+									<UptimePill uptime={monitor.uptime_stats.uptime_7d} label="7d" />
+								)}
 						</div>
-						{displayOptions.showHeartbeatDots && (
-							<UptimeDots heartbeats={monitor.recent_heartbeats} />
-						)}
+						{displayOptions.showHeartbeatDots && <UptimeDots heartbeats={monitor.recent_heartbeats} />}
 					</div>
 				)}
-				
+
 				<div className="flex items-center justify-between text-sm">
 					<div className="text-xs text-muted-foreground">Response</div>
 					<div>
@@ -266,12 +245,7 @@ function MonitorCard({
 								onClick={() => checkMutation.mutate(monitor.id)}
 								disabled={checkMutation.isPending}
 							>
-								<RefreshCwIcon
-									className={cn(
-										"h-4 w-4 mr-1",
-										checkMutation.isPending && "animate-spin"
-									)}
-								/>
+								<RefreshCwIcon className={cn("h-4 w-4 mr-1", checkMutation.isPending && "animate-spin")} />
 								Check
 							</Button>
 						</TooltipTrigger>
@@ -291,9 +265,13 @@ function MonitorCard({
 								disabled={pauseMutation.isPending}
 							>
 								{monitor.status === "paused" ? (
-									<><PlayIcon className="h-4 w-4 mr-1" /> Resume</>
+									<>
+										<PlayIcon className="h-4 w-4 mr-1" /> Resume
+									</>
 								) : (
-									<><PauseIcon className="h-4 w-4 mr-1" /> Pause</>
+									<>
+										<PauseIcon className="h-4 w-4 mr-1" /> Pause
+									</>
 								)}
 							</Button>
 						</TooltipTrigger>
@@ -307,28 +285,42 @@ function MonitorCard({
 	)
 }
 
-// Uptime pill badge component - big and visible
+// Uptime pill badge component - styled like domainstack.io status badges
 function UptimePill({ uptime, label = "24h" }: { uptime: number; label?: string }) {
-	let colorClass = "bg-green-500/15 text-green-600 border-green-500/30"
-	let icon = <CheckCircleIcon className="h-3.5 w-3.5" />
-	
+	let colorClass = "bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-400"
+	let icon = <CheckCircleIcon className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+	let ringClass = "ring-green-500/20"
+
 	if (uptime < 99.9) {
-		colorClass = "bg-green-500/15 text-green-600 border-green-500/30"
+		colorClass = "bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-400"
+		ringClass = "ring-green-500/20"
 	}
 	if (uptime < 95) {
-		colorClass = "bg-yellow-500/15 text-yellow-600 border-yellow-500/30"
-		icon = <AlertTriangle className="h-3.5 w-3.5" />
+		colorClass = "bg-yellow-500/10 text-yellow-700 border-yellow-500/20 dark:text-yellow-400"
+		icon = <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
+		ringClass = "ring-yellow-500/20"
 	}
 	if (uptime < 90) {
-		colorClass = "bg-red-500/15 text-red-600 border-red-500/30"
-		icon = <XCircle className="h-3.5 w-3.5" />
+		colorClass = "bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-400"
+		icon = <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+		ringClass = "ring-red-500/20"
 	}
 
 	return (
-		<div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 ${colorClass}`}>
+		<div
+			className={cn(
+				"inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold shadow-sm",
+				"transition-all hover:scale-105",
+				colorClass,
+				ringClass,
+				"ring-1"
+			)}
+		>
 			{icon}
-			<span className="text-sm font-bold">{formatUptime(uptime)}</span>
-			<span className="text-[10px] font-medium uppercase opacity-70">{label}</span>
+			<span>{formatUptime(uptime)}</span>
+			<span className="text-[10px] font-medium uppercase opacity-60 border-l border-current/20 pl-1.5 ml-0.5">
+				{label}
+			</span>
 		</div>
 	)
 }
@@ -339,17 +331,11 @@ function UptimeBar({ stats }: { stats?: Record<string, number> }) {
 	const uptime7d = stats?.uptime_7d ?? 100
 	const uptime30d = stats?.uptime_30d ?? 100
 
-	let color = "bg-green-500"
-	if (uptime24h < 95) color = "bg-yellow-500"
-	if (uptime24h < 90) color = "bg-red-500"
-
 	return (
 		<div className="flex flex-col gap-1.5">
 			<div className="flex items-center gap-2">
 				<UptimePill uptime={uptime24h} label="24h" />
-				{uptime7d !== 100 && uptime7d !== uptime24h && (
-					<UptimePill uptime={uptime7d} label="7d" />
-				)}
+				{uptime7d !== 100 && uptime7d !== uptime24h && <UptimePill uptime={uptime7d} label="7d" />}
 				{uptime30d !== 100 && uptime30d !== uptime24h && uptime30d !== uptime7d && (
 					<UptimePill uptime={uptime30d} label="30d" />
 				)}
@@ -358,39 +344,52 @@ function UptimeBar({ stats }: { stats?: Record<string, number> }) {
 	)
 }
 
-// Mini uptime dots visualization
+// Mini uptime dots visualization - styled as a clean status bar
 function UptimeDots({ heartbeats }: { heartbeats?: Array<{ status: string; time: string }> }) {
-	if (!heartbeats || heartbeats.length === 0) {
-		return (
-			<div className="flex gap-0.5">
-				{Array.from({ length: 12 }).map((_, i) => (
-					<div key={i} className="h-3 w-2 rounded-sm bg-muted" />
-				))}
-			</div>
-		)
+	const totalSlots = 16
+	const recent = heartbeats?.slice(-totalSlots) || []
+	const emptySlots = totalSlots - recent.length
+
+	const getStatusColor = (status: string) => {
+		switch (status) {
+			case "up":
+				return "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+			case "down":
+				return "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.4)]"
+			case "paused":
+				return "bg-gray-400"
+			default:
+				return "bg-yellow-500"
+		}
 	}
 
-	// Take last 12 heartbeats
-	const recent = heartbeats.slice(-12)
-
 	return (
-		<div className="flex gap-0.5">
-			{recent.map((hb, i) => (
-				<div
-					key={i}
-					className={cn(
-						"h-3 w-2 rounded-sm transition-colors",
-						hb.status === "up" ? "bg-green-500" : 
-						hb.status === "down" ? "bg-red-500" : 
-						hb.status === "paused" ? "bg-gray-400" : "bg-yellow-500"
-					)}
-					title={`${hb.status} at ${new Date(hb.time).toLocaleString()}`}
-				/>
-			))}
-			{recent.length < 12 && Array.from({ length: 12 - recent.length }).map((_, i) => (
-				<div key={`empty-${i}`} className="h-3 w-2 rounded-sm bg-muted" />
-			))}
-		</div>
+		<TooltipProvider>
+			<div className="flex items-center gap-1">
+				<div className="flex gap-[3px] p-1 rounded-md bg-muted/50">
+					{recent.map((hb, i) => (
+						<Tooltip key={i}>
+							<TooltipTrigger asChild>
+								<div
+									className={cn(
+										"h-4 w-[6px] rounded-full transition-all cursor-pointer hover:scale-125",
+										getStatusColor(hb.status)
+									)}
+								/>
+							</TooltipTrigger>
+							<TooltipContent side="bottom" className="text-xs">
+								<p className="capitalize font-medium">{hb.status}</p>
+								<p className="text-muted-foreground">{new Date(hb.time).toLocaleString()}</p>
+							</TooltipContent>
+						</Tooltip>
+					))}
+					{emptySlots > 0 &&
+						Array.from({ length: emptySlots }).map((_, i) => (
+							<div key={`empty-${i}`} className="h-4 w-[6px] rounded-full bg-muted" />
+						))}
+				</div>
+			</div>
+		</TooltipProvider>
 	)
 }
 
@@ -466,9 +465,7 @@ function MonitorRow({
 			</TableCell>
 			<TableCell>
 				{monitor.last_check ? (
-					<div className="text-sm">
-						{formatPing(monitor.uptime_stats?.last_ping || 0)}
-					</div>
+					<div className="text-sm">{formatPing(monitor.uptime_stats?.last_ping || 0)}</div>
 				) : (
 					<span className="text-sm text-muted-foreground">-</span>
 				)}
@@ -505,12 +502,7 @@ function MonitorRow({
 									onClick={() => checkMutation.mutate(monitor.id)}
 									disabled={checkMutation.isPending}
 								>
-									<RefreshCwIcon
-										className={cn(
-											"h-4 w-4",
-											checkMutation.isPending && "animate-spin"
-										)}
-									/>
+									<RefreshCwIcon className={cn("h-4 w-4", checkMutation.isPending && "animate-spin")} />
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>
@@ -529,11 +521,7 @@ function MonitorRow({
 									onClick={() => pauseMutation.mutate(monitor.id)}
 									disabled={pauseMutation.isPending}
 								>
-									{monitor.status === "paused" ? (
-										<PlayIcon className="h-4 w-4" />
-									) : (
-										<PauseIcon className="h-4 w-4" />
-									)}
+									{monitor.status === "paused" ? <PlayIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
 								</Button>
 							</TooltipTrigger>
 							<TooltipContent>
@@ -553,10 +541,7 @@ function MonitorRow({
 								<Edit3Icon className="mr-2 h-4 w-4" />
 								Edit
 							</DropdownMenuItem>
-							<DropdownMenuItem
-								className="text-destructive"
-								onClick={() => deleteMutation.mutate(monitor.id)}
-							>
+							<DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(monitor.id)}>
 								<Trash2Icon className="mr-2 h-4 w-4" />
 								Delete
 							</DropdownMenuItem>
@@ -587,16 +572,17 @@ export default memo(function MonitorsTable() {
 	const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
 	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 	const [editingMonitor, setEditingMonitor] = useState<Monitor | null>(null)
-	
+
 	const [viewMode, setViewMode] = useBrowserStorage<ViewMode>(
 		"monitorsViewMode",
 		window.innerWidth < 1024 ? "grid" : "table"
 	)
 
-	const [displayOptions, setDisplayOptions] = useBrowserStorage<DisplayOptions>(
-		"monitorsDisplayOptions",
-		{ showUptimePills: true, showUptimePercentage: true, showHeartbeatDots: true }
-	)
+	const [displayOptions, setDisplayOptions] = useBrowserStorage<DisplayOptions>("monitorsDisplayOptions", {
+		showUptimePills: true,
+		showUptimePercentage: true,
+		showHeartbeatDots: true,
+	})
 
 	const { data: monitors = [], isLoading } = useQuery({
 		queryKey: ["monitors"],
@@ -673,8 +659,7 @@ export default memo(function MonitorsTable() {
 									{stats.down > 0 && (
 										<>
 											{" "}
-											{stats.down}{" "}
-											<ArrowDownIcon className="inline h-3 w-3 text-red-500" />
+											{stats.down} <ArrowDownIcon className="inline h-3 w-3 text-red-500" />
 										</>
 									)}
 									{stats.paused > 0 && (
@@ -939,10 +924,7 @@ export default memo(function MonitorsTable() {
 			</CardContent>
 
 			{/* Add Monitor Dialog */}
-			<AddMonitorDialog
-				open={isAddDialogOpen}
-				onOpenChange={setIsAddDialogOpen}
-			/>
+			<AddMonitorDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
 
 			{/* Edit Monitor Dialog */}
 			{editingMonitor && (

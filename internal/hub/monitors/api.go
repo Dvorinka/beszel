@@ -8,6 +8,7 @@ import (
 
 	"github.com/henrygd/beszel/internal/entities/monitor"
 	"github.com/henrygd/beszel/internal/hub/pagespeed"
+	"github.com/henrygd/beszel/internal/hub/utils"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -641,10 +642,11 @@ func (h *APIHandler) runPageSpeedCheck(e *core.RequestEvent) error {
 		return e.BadRequestError("strategy must be 'mobile' or 'desktop'", nil)
 	}
 
-	checker := pagespeed.NewChecker("")
+	apiKey, _ := utils.GetEnv("PAGESPEED_API_KEY")
+	checker := pagespeed.NewChecker(apiKey)
 	metrics, err := checker.CheckURL(url, strategy)
 	if err != nil {
-		return e.InternalServerError("PageSpeed check failed", err)
+		return e.BadRequestError("PageSpeed check failed: "+err.Error(), err)
 	}
 
 	vitals := pagespeed.GetCoreWebVitalsStatus(metrics)

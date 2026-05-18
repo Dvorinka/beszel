@@ -1826,6 +1826,10 @@ msgid "Response"
 msgstr "Response"
 
 #: src/components/routes/monitor.tsx
+msgid "Response time over the selected period"
+msgstr "Response time over the selected period"
+
+#: src/components/routes/monitor.tsx
 #~ msgid "Response Times"
 #~ msgstr "Response Times"
 
@@ -2036,8 +2040,8 @@ msgid "Status"
 msgstr "Status"
 
 #: src/components/routes/monitor.tsx
-msgid "Status and response time over the selected period"
-msgstr "Status and response time over the selected period"
+#~ msgid "Status and response time over the selected period"
+#~ msgstr "Status and response time over the selected period"
 
 #: src/components/routes/status-pages.tsx
 msgid "Status Page Manager"

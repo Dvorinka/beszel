@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -35,6 +36,9 @@ import {
 	Zap,
 	Gauge,
 	Smartphone,
+	Lock,
+	Eye,
+	LayoutDashboard,
 	type LucideIcon,
 } from "lucide-react"
 import {
@@ -62,21 +66,11 @@ import {
 	getStatusPageUrl,
 	removeMonitorFromStatusPage,
 } from "@/lib/statuspages"
-import {
-	Bar,
-	XAxis,
-	YAxis,
-	CartesianGrid,
-	Tooltip,
-	ResponsiveContainer,
-	Area,
-	Cell,
-	ComposedChart,
-	Legend,
-} from "recharts"
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from "recharts"
 import { Link, navigate } from "@/components/router"
 import { AddMonitorDialog } from "@/components/monitors-table/add-monitor-dialog"
 import { cn } from "@/lib/utils"
+import { MonitorInfoSections } from "./monitor-info-sections"
 
 type HeartbeatRow = Heartbeat
 
@@ -105,9 +99,13 @@ function UptimeBarVisualization({ heartbeats }: { heartbeats?: HeartbeatRow[] })
 						key={i}
 						className={cn(
 							"flex-1 rounded-sm transition-all hover:opacity-80 cursor-pointer",
-							hb.status === "up" ? "bg-green-500" : 
-							hb.status === "down" ? "bg-red-500" : 
-							hb.status === "paused" ? "bg-gray-400" : "bg-yellow-500"
+							hb.status === "up"
+								? "bg-green-500"
+								: hb.status === "down"
+									? "bg-red-500"
+									: hb.status === "paused"
+										? "bg-gray-400"
+										: "bg-yellow-500"
 						)}
 						title={`${hb.status} • ${formatPing(hb.ping)} • ${formatDate(hb.time || "")}`}
 					/>
@@ -118,11 +116,11 @@ function UptimeBarVisualization({ heartbeats }: { heartbeats?: HeartbeatRow[] })
 				<span>
 					<span className="inline-flex items-center gap-1">
 						<span className="w-2 h-2 rounded-full bg-green-500" />
-						{recent.filter(h => h.status === "up").length} up
+						{recent.filter((h) => h.status === "up").length} up
 					</span>
 					<span className="inline-flex items-center gap-1 ml-3">
 						<span className="w-2 h-2 rounded-full bg-red-500" />
-						{recent.filter(h => h.status === "down").length} down
+						{recent.filter((h) => h.status === "down").length} down
 					</span>
 				</span>
 			</div>
@@ -134,16 +132,16 @@ function UptimeBarVisualization({ heartbeats }: { heartbeats?: HeartbeatRow[] })
 function ResponseTimeStats({ heartbeats }: { heartbeats?: HeartbeatRow[] }) {
 	const stats = useMemo(() => {
 		if (!heartbeats?.length) return null
-		const pings = heartbeats.filter(h => h.ping && h.ping > 0).map(h => h.ping)
+		const pings = heartbeats.filter((h) => h.ping && h.ping > 0).map((h) => h.ping)
 		if (!pings.length) return null
-		
+
 		const sorted = [...pings].sort((a, b) => a - b)
 		const avg = Math.round(pings.reduce((a, b) => a + b, 0) / pings.length)
 		const min = sorted[0]
 		const max = sorted[sorted.length - 1]
 		const p95 = sorted[Math.floor(sorted.length * 0.95)]
 		const p99 = sorted[Math.floor(sorted.length * 0.99)]
-		
+
 		return { avg, min, max, p95, p99, count: pings.length }
 	}, [heartbeats])
 
@@ -177,17 +175,23 @@ function ResponseTimeStats({ heartbeats }: { heartbeats?: HeartbeatRow[] }) {
 
 function getVitalColor(status: string): string {
 	switch (status) {
-		case "good": return "text-green-500"
-		case "needs-improvement": return "text-yellow-500"
-		default: return "text-red-500"
+		case "good":
+			return "text-green-500"
+		case "needs-improvement":
+			return "text-yellow-500"
+		default:
+			return "text-red-500"
 	}
 }
 
 function getVitalBg(status: string): string {
 	switch (status) {
-		case "good": return "bg-green-500/10 border-green-500/20"
-		case "needs-improvement": return "bg-yellow-500/10 border-yellow-500/20"
-		default: return "bg-red-500/10 border-red-500/20"
+		case "good":
+			return "bg-green-500/10 border-green-500/20"
+		case "needs-improvement":
+			return "bg-yellow-500/10 border-yellow-500/20"
+		default:
+			return "bg-red-500/10 border-red-500/20"
 	}
 }
 
@@ -199,10 +203,27 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 	return (
 		<div className="flex flex-col items-center gap-1">
 			<div className="relative w-12 h-12">
-				<svg className="w-12 h-12 -rotate-90" viewBox="0 0 44 44">
+				<svg
+					className="w-12 h-12 -rotate-90"
+					viewBox="0 0 44 44"
+					role="img"
+					aria-label={`Score ${Math.round(score)} for ${label}`}
+				>
+					<title>
+						Score {Math.round(score)} for {label}
+					</title>
 					<circle cx="22" cy="22" r="18" fill="none" stroke="currentColor" strokeWidth="4" className="text-muted/30" />
-					<circle cx="22" cy="22" r="18" fill="none" strokeWidth="4" strokeLinecap="round"
-						className={bg} strokeDasharray={circumference} strokeDashoffset={offset} />
+					<circle
+						cx="22"
+						cy="22"
+						r="18"
+						fill="none"
+						strokeWidth="4"
+						strokeLinecap="round"
+						className={bg}
+						strokeDasharray={circumference}
+						strokeDashoffset={offset}
+					/>
 				</svg>
 				<span className={cn("absolute inset-0 flex items-center justify-center text-xs font-bold", color)}>
 					{Math.round(score)}
@@ -218,7 +239,12 @@ function VitalCard({ label, value, status, detail }: { label: string; value: str
 		<div className={cn("p-3 rounded-lg border", getVitalBg(status))}>
 			<div className="flex items-center justify-between mb-1">
 				<span className="text-xs text-muted-foreground">{label}</span>
-				<div className={cn("w-2 h-2 rounded-full", status === "good" ? "bg-green-500" : status === "needs-improvement" ? "bg-yellow-500" : "bg-red-500")} />
+				<div
+					className={cn(
+						"w-2 h-2 rounded-full",
+						status === "good" ? "bg-green-500" : status === "needs-improvement" ? "bg-yellow-500" : "bg-red-500"
+					)}
+				/>
 			</div>
 			<div className={cn("text-lg font-bold", getVitalColor(status))}>{value}</div>
 			<div className="text-[10px] text-muted-foreground">{detail}</div>
@@ -232,11 +258,14 @@ function formatMs(ms: number): string {
 }
 
 function CoreWebVitalsCard({ monitorId, url }: { monitorId: string; url?: string }) {
-	if (!url) return null
 	const [strategy, setStrategy] = useState<"mobile" | "desktop">("mobile")
 	const { toast } = useToast()
 
-	const { data, isPending: isPageSpeedLoading, mutate } = useMutation({
+	const {
+		data,
+		isPending: isPageSpeedLoading,
+		mutate,
+	} = useMutation({
 		mutationFn: () => runPageSpeedCheck(monitorId, strategy),
 		onSuccess: () => {
 			toast({ title: "Lighthouse check complete" })
@@ -245,6 +274,8 @@ function CoreWebVitalsCard({ monitorId, url }: { monitorId: string; url?: string
 			toast({ title: "Check failed", description: err.message, variant: "destructive" })
 		},
 	})
+
+	if (!url) return null
 
 	return (
 		<Card>
@@ -255,24 +286,32 @@ function CoreWebVitalsCard({ monitorId, url }: { monitorId: string; url?: string
 						Core Web Vitals
 					</CardTitle>
 					<CardDescription>
-						{data ? `Checked ${new Date(data.checkedAt).toLocaleString()}` : "Run a Lighthouse check to get performance metrics"}
+						{data
+							? `Checked ${new Date(data.checkedAt).toLocaleString()}`
+							: "Run a Lighthouse check to get performance metrics"}
 					</CardDescription>
 				</div>
 				<div className="flex items-center gap-2">
 					<div className="flex rounded-lg border overflow-hidden">
 						<button
 							onClick={() => setStrategy("mobile")}
-							className={cn("px-3 py-1.5 text-xs font-medium transition-colors",
-								strategy === "mobile" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80")}
+							className={cn(
+								"px-3 py-1.5 text-xs font-medium transition-colors",
+								strategy === "mobile" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+							)}
 						>
-							<Smartphone className="h-3 w-3 inline mr-1" />Mobile
+							<Smartphone className="h-3 w-3 inline mr-1" />
+							Mobile
 						</button>
 						<button
 							onClick={() => setStrategy("desktop")}
-							className={cn("px-3 py-1.5 text-xs font-medium transition-colors",
-								strategy === "desktop" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80")}
+							className={cn(
+								"px-3 py-1.5 text-xs font-medium transition-colors",
+								strategy === "desktop" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+							)}
 						>
-							<Gauge className="h-3 w-3 inline mr-1" />Desktop
+							<Gauge className="h-3 w-3 inline mr-1" />
+							Desktop
 						</button>
 					</div>
 					<Button size="sm" onClick={() => mutate()} disabled={isPageSpeedLoading}>
@@ -294,12 +333,42 @@ function CoreWebVitalsCard({ monitorId, url }: { monitorId: string; url?: string
 
 						{/* Core Web Vitals */}
 						<div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-							<VitalCard label="LCP" value={formatMs(data.lcp)} status={data.vitals.lcp || "poor"} detail="Largest Contentful Paint" />
-							<VitalCard label="FID" value={formatMs(data.tbt)} status={data.vitals.fid || "poor"} detail="Total Blocking Time (proxy)" />
-							<VitalCard label="CLS" value={data.cls.toFixed(3)} status={data.vitals.cls || "poor"} detail="Cumulative Layout Shift" />
-							<VitalCard label="FCP" value={formatMs(data.fcp)} status={data.vitals.fcp || "poor"} detail="First Contentful Paint" />
-							<VitalCard label="TTFB" value={formatMs(data.ttfb)} status={data.vitals.ttfb || "poor"} detail="Time to First Byte" />
-							<VitalCard label="TTI" value={formatMs(data.tti)} status={data.vitals.tti || "poor"} detail="Time to Interactive" />
+							<VitalCard
+								label="LCP"
+								value={formatMs(data.lcp)}
+								status={data.vitals.lcp || "poor"}
+								detail="Largest Contentful Paint"
+							/>
+							<VitalCard
+								label="FID"
+								value={formatMs(data.tbt)}
+								status={data.vitals.fid || "poor"}
+								detail="Total Blocking Time (proxy)"
+							/>
+							<VitalCard
+								label="CLS"
+								value={data.cls.toFixed(3)}
+								status={data.vitals.cls || "poor"}
+								detail="Cumulative Layout Shift"
+							/>
+							<VitalCard
+								label="FCP"
+								value={formatMs(data.fcp)}
+								status={data.vitals.fcp || "poor"}
+								detail="First Contentful Paint"
+							/>
+							<VitalCard
+								label="TTFB"
+								value={formatMs(data.ttfb)}
+								status={data.vitals.ttfb || "poor"}
+								detail="Time to First Byte"
+							/>
+							<VitalCard
+								label="TTI"
+								value={formatMs(data.tti)}
+								status={data.vitals.tti || "poor"}
+								detail="Time to Interactive"
+							/>
 						</div>
 					</div>
 				) : (
@@ -377,6 +446,15 @@ function StatCard({
 	)
 }
 
+function MonitorFaviconImage({ monitor, iconColor }: { monitor: Monitor; iconColor: string }) {
+	const [error, setError] = useState(false)
+	const faviconUrl = getMonitorFaviconUrl(monitor)
+	if (!faviconUrl || error) {
+		return <Globe className={cn("h-6 w-6", iconColor)} />
+	}
+	return <img src={faviconUrl} alt="" className="h-6 w-6 object-contain" onError={() => setError(true)} />
+}
+
 export default memo(function MonitorDetail({ id }: { id: string }) {
 	const { toast } = useToast()
 	const queryClient = useQueryClient()
@@ -438,6 +516,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 	const [isCreateStatusPageOpen, setIsCreateStatusPageOpen] = useState(false)
 	const [statusPageName, setStatusPageName] = useState("")
 	const [statusPageSlug, setStatusPageSlug] = useState("")
+	const [statusPagePublic, setStatusPagePublic] = useState(true)
 
 	const { data: statusPages } = useQuery({
 		queryKey: ["status-pages"],
@@ -474,19 +553,29 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 	})
 
 	const createStatusPageMutation = useMutation({
-		mutationFn: () =>
-			createStatusPage({
+		mutationFn: async () => {
+			const page = await createStatusPage({
 				name: statusPageName || `${monitor?.name} Status`,
 				slug: statusPageSlug || monitor?.name?.toLowerCase().replace(/\s+/g, "-") || "status",
 				title: statusPageName || `${monitor?.name} Status Page`,
-				public: true,
-			}),
-		onSuccess: () => {
+				public: statusPagePublic,
+			})
+			// Auto-link this monitor to the newly created status page
+			await addMonitorToStatusPage(page.id, { monitor: id })
+			return page
+		},
+		onSuccess: (page) => {
 			queryClient.invalidateQueries({ queryKey: ["status-pages"] })
-			toast({ title: "Status page created" })
+			queryClient.invalidateQueries({ queryKey: ["monitor-status-page-links", id] })
+			toast({ title: "Status page created and monitor linked" })
 			setIsCreateStatusPageOpen(false)
 			setStatusPageName("")
 			setStatusPageSlug("")
+			setStatusPagePublic(true)
+			// Open private pages in new tab since user is authenticated
+			if (!page.public) {
+				window.open(getStatusPageUrl(page.slug), "_blank", "noopener,noreferrer")
+			}
 		},
 	})
 
@@ -561,18 +650,20 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 	const isPaused = monitor.status === "paused"
 	const isPending = monitor.status === "pending"
 
-	const headerIconColor = isUp ? "text-green-500" : isPaused ? "text-gray-500" : isPending ? "text-yellow-500" : "text-red-500"
-	const headerBgColor = isUp ? "bg-green-500/10" : isPaused ? "bg-gray-500/10" : isPending ? "bg-yellow-500/10" : "bg-red-500/10"
-
-	// Favicon component
-	function MonitorFaviconImage({ monitor }: { monitor: Monitor }) {
-		const [error, setError] = useState(false)
-		const faviconUrl = getMonitorFaviconUrl(monitor)
-		if (!faviconUrl || error) {
-			return <Globe className={cn("h-6 w-6", headerIconColor)} />
-		}
-		return <img src={faviconUrl} alt="" className="h-6 w-6 object-contain" onError={() => setError(true)} />
-	}
+	const headerIconColor = isUp
+		? "text-green-500"
+		: isPaused
+			? "text-gray-500"
+			: isPending
+				? "text-yellow-500"
+				: "text-red-500"
+	const headerBgColor = isUp
+		? "bg-green-500/10"
+		: isPaused
+			? "bg-gray-500/10"
+			: isPending
+				? "bg-yellow-500/10"
+				: "bg-red-500/10"
 
 	return (
 		<div className="grid gap-4 mb-14">
@@ -581,13 +672,8 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 				<CardContent className="p-6">
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 						<div className="flex items-center gap-4">
-							<div
-								className={cn(
-									"h-12 w-12 rounded-full flex items-center justify-center",
-									headerBgColor
-								)}
-							>
-								<MonitorFaviconImage monitor={monitor} />
+							<div className={cn("h-12 w-12 rounded-full flex items-center justify-center", headerBgColor)}>
+								<MonitorFaviconImage monitor={monitor} iconColor={headerIconColor} />
 							</div>
 							<div>
 								<h1 className="text-2xl font-bold">{monitor.name}</h1>
@@ -697,13 +783,16 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 			{/* Core Web Vitals */}
 			<CoreWebVitalsCard monitorId={id} url={monitor.url} />
 
-			{/* Combined Uptime & Response Chart */}
+			{/* Domain Info Sections */}
+			<MonitorInfoSections monitor={monitor} heartbeats={heartbeats} />
+
+			{/* Response Time Chart */}
 			<Card>
 				<CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 					<div>
-						<CardTitle>Uptime & Response Time</CardTitle>
+						<CardTitle>Response Time</CardTitle>
 						<CardDescription>
-							<Trans>Status and response time over the selected period</Trans>
+							<Trans>Response time over the selected period</Trans>
 						</CardDescription>
 					</div>
 					<div className="flex items-center gap-2">
@@ -723,45 +812,36 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 					<div className="h-[300px]">
 						{chartData.length > 0 ? (
 							<ResponsiveContainer width="100%" height="100%">
-								<ComposedChart data={chartData}>
+								<LineChart data={chartData}>
 									<defs>
 										<linearGradient id="colorResponse" x1="0" y1="0" x2="0" y2="1">
-											<stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-											<stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+											<stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3} />
+											<stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0} />
 										</linearGradient>
 									</defs>
-									<CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-									<XAxis dataKey="time" tick={{ fontSize: 12 }} />
-									<YAxis yAxisId="left" tick={{ fontSize: 12 }} unit="ms" />
-									<YAxis
-										yAxisId="right"
-										orientation="right"
-										tick={{ fontSize: 12 }}
-										domain={[0, 1]}
-										tickFormatter={(v) => (v === 1 ? "Up" : "Down")}
-									/>
+									<CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+									<XAxis dataKey="time" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+									<YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} unit="ms" />
 									<Tooltip
 										contentStyle={{
 											backgroundColor: "hsl(var(--card))",
 											border: "1px solid hsl(var(--border))",
+											borderRadius: "8px",
 										}}
+										formatter={(value: number) => [`${value}ms`, "Response Time"]}
 									/>
-									<Legend />
-									<Area
-										yAxisId="left"
+									<Line
 										type="monotone"
 										dataKey="responseTime"
-										stroke="#3b82f6"
+										stroke="hsl(var(--chart-1))"
+										strokeWidth={1.5}
 										fillOpacity={1}
 										fill="url(#colorResponse)"
-										name="Response Time (ms)"
+										name="Response Time"
+										isAnimationActive={false}
+										dot={false}
 									/>
-									<Bar yAxisId="right" dataKey="status" barSize={4} name="Status">
-										{chartData.map((entry, index) => (
-											<Cell key={`cell-${index}`} fill={entry.status === 1 ? "#22c55e" : "#ef4444"} />
-										))}
-									</Bar>
-								</ComposedChart>
+								</LineChart>
 							</ResponsiveContainer>
 						) : (
 							<div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -783,7 +863,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 										<RefreshCw className={cn("mr-2 h-4 w-4", checkMutation.isPending && "animate-spin")} />
 										Run First Check
 									</Button>
-									)}
+								)}
 							</div>
 						)}
 					</div>
@@ -823,28 +903,46 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 
 				<Card>
 					<CardHeader>
-						<CardTitle>Status Page</CardTitle>
-						<CardDescription>Link this monitor to public status pages</CardDescription>
+						<div className="flex items-center justify-between">
+							<div>
+								<CardTitle>Status Page</CardTitle>
+								<CardDescription>Create or link to status pages</CardDescription>
+							</div>
+							<Button variant="outline" size="sm" onClick={() => setIsCreateStatusPageOpen(true)}>
+								<Plus className="mr-2 h-4 w-4" />
+								Create New
+							</Button>
+						</div>
 					</CardHeader>
 					<CardContent className="space-y-3">
 						{statusPages && statusPages.length > 0 ? (
-							<div className="space-y-3">
+							<div className="space-y-2">
 								{statusPages.map((page) => {
 									const isLinked = linkedStatusPageMonitors?.some((link) => link.status_page_id === page.id) || false
 									const linkInfo = linkedStatusPageMonitors?.find((link) => link.status_page_id === page.id)
-									
+
 									return (
-										<div 
-											key={page.id} 
-											className={`flex items-center justify-between p-3 rounded-lg border ${
-												isLinked ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
-											}`}
+										<div
+											key={page.id}
+											className={cn(
+												"flex items-center justify-between p-3 rounded-lg border transition-colors",
+												isLinked ? "bg-primary/5 border-primary/20" : "bg-muted/30 border-border"
+											)}
 										>
 											<div className="min-w-0 flex-1">
 												<div className="flex items-center gap-2">
+													<LayoutDashboard className="h-3.5 w-3.5 text-muted-foreground" />
 													<span className="font-medium text-sm truncate">{page.name}</span>
-													{page.public && (
-														<Globe className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+													{page.public ? (
+														<Badge variant="outline" className="text-[10px] gap-1">
+															<Eye className="h-2.5 w-2.5" />
+															Public
+														</Badge>
+													) : (
+														<Badge variant="outline" className="text-[10px] gap-1">
+															<Lock className="h-2.5 w-2.5" />
+															Private
+														</Badge>
 													)}
 												</div>
 												{isLinked && linkInfo && (
@@ -853,30 +951,24 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 														{linkInfo.group && ` • Group: ${linkInfo.group}`}
 													</p>
 												)}
-												{!isLinked && page.public && (
+												{!isLinked && (
 													<p className="text-xs text-muted-foreground mt-1">
-														{page.monitor_count} monitor{page.monitor_count !== 1 ? 's' : ''} linked
+														{page.monitor_count} monitor{page.monitor_count !== 1 ? "s" : ""} linked
 													</p>
 												)}
 											</div>
 											<div className="flex items-center gap-2 ml-2">
-												{isLinked && page.public && (
-													<Button
-														variant="ghost"
-														size="icon"
-														className="h-8 w-8"
-														asChild
-													>
-														<a
-															href={getStatusPageUrl(page.slug)}
-															target="_blank"
-															rel="noopener noreferrer"
-															title="View public status page"
-														>
-															<ExternalLink className="h-4 w-4" />
-														</a>
-													</Button>
-												)}
+												<Button
+													variant="ghost"
+													size="icon"
+													className="h-8 w-8"
+													asChild
+													title={page.public ? "View public status page" : "View private status page"}
+												>
+													<a href={getStatusPageUrl(page.slug)} target="_blank" rel="noopener noreferrer">
+														<ExternalLink className="h-4 w-4" />
+													</a>
+												</Button>
 												<Button
 													variant={isLinked ? "default" : "outline"}
 													size="sm"
@@ -905,92 +997,14 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 						) : (
 							<div className="text-center py-4">
 								<p className="text-sm text-muted-foreground">No status pages yet.</p>
-								<p className="text-xs text-muted-foreground mt-1">Create one to share your service status publicly.</p>
+								<p className="text-xs text-muted-foreground mt-1">
+									Create one to share your service status or keep it private for internal use.
+								</p>
 							</div>
 						)}
-						<Button variant="outline" size="sm" className="w-full" onClick={() => setIsCreateStatusPageOpen(true)}>
-							<Plus className="mr-2 h-4 w-4" />
-							Create Status Page
-						</Button>
 					</CardContent>
 				</Card>
 			</div>
-
-			<Card>
-				<CardHeader>
-					<CardTitle>Check History</CardTitle>
-					<CardDescription>Timeline of the last 50 monitor checks</CardDescription>
-				</CardHeader>
-				<CardContent>
-					{heartbeats?.length ? (
-						<div className="space-y-1">
-							{heartbeats.slice(0, 50).map((hb: Heartbeat, i: number) => {
-								const date = new Date(hb.time || "")
-								const showDate = i === 0 || (
-									new Date(heartbeats[i - 1].time || "").toDateString() !== date.toDateString()
-								)
-								return (
-									<div key={hb.id}>
-										{showDate && (
-											<div className="text-xs text-muted-foreground font-medium py-1.5 border-b border-border/50 mt-2 first:mt-0">
-												{date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-											</div>
-										)}
-										<div className="flex items-center gap-3 py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors">
-											<div className={cn(
-												"w-2 h-2 rounded-full flex-shrink-0",
-												hb.status === "up" ? "bg-green-500" :
-												hb.status === "down" ? "bg-red-500" :
-												hb.status === "paused" ? "bg-gray-400" : "bg-yellow-500"
-											)} />
-											<div className="flex-1 min-w-0">
-												<div className="flex items-center gap-2">
-													<span className={cn(
-														"text-xs font-medium",
-														hb.status === "up" ? "text-green-600" :
-														hb.status === "down" ? "text-red-600" : "text-muted-foreground"
-													)}>
-														{hb.status}
-													</span>
-													<span className="text-xs text-muted-foreground">
-														{date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-													</span>
-												</div>
-												{hb.msg && hb.msg !== "-" && (
-													<p className="text-[11px] text-muted-foreground truncate">{hb.msg}</p>
-												)}
-											</div>
-											<div className="text-xs font-mono text-muted-foreground flex-shrink-0">
-												{formatPing(hb.ping)}
-											</div>
-										</div>
-									</div>
-								)
-							})}
-						</div>
-					) : (
-						<div className="flex flex-col items-center justify-center py-8 gap-3 text-muted-foreground">
-							<div className="p-2 bg-muted/50 rounded-full">
-								<Clock className="h-5 w-5 opacity-50" />
-							</div>
-							<p className="text-sm">
-								{isPending ? "No checks have been run yet." : "No check history available."}
-							</p>
-							{isPending && (
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => checkMutation.mutate()}
-									disabled={checkMutation.isPending}
-								>
-									<RefreshCw className={cn("mr-2 h-4 w-4", checkMutation.isPending && "animate-spin")} />
-									Run First Check
-								</Button>
-							)}
-						</div>
-					)}
-				</CardContent>
-			</Card>
 
 			{/* Create Status Page Dialog */}
 			{isCreateStatusPageOpen && (
@@ -998,7 +1012,7 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 					<AlertDialogContent>
 						<AlertDialogHeader>
 							<AlertDialogTitle>Create Status Page</AlertDialogTitle>
-							<AlertDialogDescription>Create a public status page for this monitor.</AlertDialogDescription>
+							<AlertDialogDescription>Create a status page and optionally link this monitor.</AlertDialogDescription>
 						</AlertDialogHeader>
 						<div className="grid gap-4 py-4">
 							<div className="grid gap-2">
@@ -1018,6 +1032,15 @@ export default memo(function MonitorDetail({ id }: { id: string }) {
 									onChange={(e) => setStatusPageSlug(e.target.value)}
 									placeholder={monitor.name?.toLowerCase().replace(/\s+/g, "-")}
 								/>
+							</div>
+							<div className="flex items-center justify-between rounded-lg border p-3">
+								<div className="space-y-0.5">
+									<Label htmlFor="sp-public" className="text-sm font-medium">
+										Public Status Page
+									</Label>
+									<p className="text-xs text-muted-foreground">Anyone can view this page without authentication.</p>
+								</div>
+								<Switch id="sp-public" checked={statusPagePublic} onCheckedChange={setStatusPagePublic} />
 							</div>
 						</div>
 						<AlertDialogFooter>
