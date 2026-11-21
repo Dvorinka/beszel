@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -358,15 +359,24 @@ func (s *Scheduler) checkDomain(record *core.Record) error {
 		s.saveHistory(h, record.Id, userID)
 	}
 
+	// Fire change notifications gated by the domain's notify_on_* flags
+	s.notifyDomainChanges(record, history)
+
 	// Trigger notifications for expiring domains
-	if status == domain.DomainStatusExpiring || status == domain.DomainStatusExpired {
+	if (status == domain.DomainStatusExpiring || status == domain.DomainStatusExpired) &&
+		record.GetBool("notify_on_expiry") && !inDomainQuietHours(record) {
 		s.triggerNotification(record, status)
 	}
 
-	// Check SSL expiry
-	if newData.SSLAlertEnabled && newData.SSLValidTo != nil {
+	// Check SSL expiry. Preferences live on the record, not the lookup result.
+	if record.GetBool("ssl_alert_enabled") && record.GetBool("notify_on_ssl_expiry") &&
+		!inDomainQuietHours(record) && newData.SSLValidTo != nil {
 		sslDays := newData.SSLDaysUntilExpiry()
-		if sslDays <= newData.AlertDaysBefore {
+		sslAlertDays := record.GetInt("ssl_alert_days")
+		if sslAlertDays <= 0 {
+			sslAlertDays = 14
+		}
+		if sslDays <= sslAlertDays {
 			s.triggerSSLNotification(record, sslDays)
 		}
 	}
@@ -520,7 +530,40 @@ func (s *Scheduler) trackChanges(oldRecord *core.Record, newData *domain.Domain,
 		})
 	}
 
+	// Check DNS records (nameservers, MX) and IP addresses. The first check
+	// has no baseline, so empty old values are skipped to avoid noise.
+	checkSlice := func(field, changeType string, oldVals, newVals []string) {
+		// Skip empty baselines (first check) and empty results — a failed or
+		// partial lookup returns no records, which is not a real removal.
+		if len(oldVals) == 0 || len(newVals) == 0 || equalStringSets(oldVals, newVals) {
+			return
+		}
+		history = append(history, domain.DomainHistory{
+			ChangeType: changeType,
+			FieldName:  field,
+			OldValue:   strings.Join(oldVals, ", "),
+			NewValue:   strings.Join(newVals, ", "),
+			CreatedAt:  now,
+		})
+	}
+	checkSlice("name_servers", domain.ChangeTypeDNS, oldRecord.GetStringSlice("name_servers"), newData.NameServers)
+	checkSlice("mx_records", domain.ChangeTypeDNS, oldRecord.GetStringSlice("mx_records"), newData.MXRecords)
+	checkSlice("ipv4_addresses", domain.ChangeTypeIP, oldRecord.GetStringSlice("ipv4_addresses"), newData.IPv4Addresses)
+	checkSlice("ipv6_addresses", domain.ChangeTypeIP, oldRecord.GetStringSlice("ipv6_addresses"), newData.IPv6Addresses)
+
 	return history
+}
+
+// equalStringSets compares two string slices ignoring order.
+func equalStringSets(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	as := slices.Clone(a)
+	bs := slices.Clone(b)
+	slices.Sort(as)
+	slices.Sort(bs)
+	return slices.Equal(as, bs)
 }
 
 // saveHistory saves a history entry to the database
@@ -545,6 +588,59 @@ func (s *Scheduler) saveHistory(h domain.DomainHistory, domainID, userID string)
 }
 
 // triggerNotification sends notification for domain events
+// inDomainQuietHours reports whether the domain's own quiet-hours window
+// (HH:MM, may wrap past midnight) currently suppresses notifications.
+func inDomainQuietHours(record *core.Record) bool {
+	if !record.GetBool("quiet_hours_enabled") {
+		return false
+	}
+	start := record.GetString("quiet_hours_start")
+	end := record.GetString("quiet_hours_end")
+	if start == "" || end == "" {
+		return false
+	}
+	now := time.Now().Format("15:04")
+	if start <= end {
+		return now >= start && now < end
+	}
+	return now >= start || now < end
+}
+
+// notifyDomainChanges sends alerts for tracked domain changes, gated by the
+// per-domain notify_on_* flags. Change types without a matching flag are
+// skipped (expiry/status/ssl-expiry have their own dedicated alerts).
+func (s *Scheduler) notifyDomainChanges(record *core.Record, history []domain.DomainHistory) {
+	if s.alertCallback == nil || len(history) == 0 || inDomainQuietHours(record) {
+		return
+	}
+	userID := record.GetString("user")
+	if userID == "" {
+		return
+	}
+	notifyDNS := record.GetBool("notify_on_dns_change")
+	notifyRegistrar := record.GetBool("notify_on_registrar_change")
+	for _, h := range history {
+		var notify bool
+		var label string
+		switch h.ChangeType {
+		case domain.ChangeTypeDNS, domain.ChangeTypeIP, domain.ChangeTypeHost, domain.ChangeTypeProvider:
+			notify, label = notifyDNS, "DNS/infrastructure"
+		case domain.ChangeTypeRegistrar, domain.ChangeTypeSecurity:
+			notify, label = notifyRegistrar, "registrar/security"
+		default:
+			continue
+		}
+		if !notify {
+			continue
+		}
+		domainName := record.GetString("domain_name")
+		title := fmt.Sprintf("%s change: %s", label, domainName)
+		body := fmt.Sprintf("%s changed from %s to %s.", h.FieldName, h.OldValue, h.NewValue)
+		log.Printf("[domain-scheduler] %s: %s", title, body)
+		s.alertCallback(userID, title, body, fmt.Sprintf("/domain/%s", record.Id), "View Domain")
+	}
+}
+
 func (s *Scheduler) triggerAvailabilityAlert(record *core.Record, availability string) {
 	if s.alertCallback == nil {
 		return
