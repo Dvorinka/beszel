@@ -283,6 +283,19 @@ export function RegistrationSection({ domain }: { domain: Domain }) {
 						) : null
 					}
 				/>
+				{domain.availability && (
+					<KV
+						label="Availability"
+						value={domain.availability === "available" ? "Available for registration" : "Registered"}
+						leading={
+							domain.availability === "available" ? (
+								<CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+							) : (
+								<Globe className="h-3.5 w-3.5 text-muted-foreground" />
+							)
+						}
+					/>
+				)}
 				{domain.registrar_id && <KV label="Registrar IANA ID" value={domain.registrar_id} />}
 				{domain.whois_server && <KV label="WHOIS Server" value={domain.whois_server} />}
 			</KVGrid>

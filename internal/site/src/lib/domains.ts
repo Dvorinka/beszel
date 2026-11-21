@@ -247,6 +247,7 @@ export interface DomainLookupResult {
 	domain_name: string
 	status: string
 	active: boolean
+	availability?: "available" | "registered" | ""
 	expiry_date?: string
 	creation_date?: string
 	updated_date?: string

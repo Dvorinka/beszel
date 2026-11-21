@@ -428,6 +428,14 @@ export function DomainDialog({ open, onOpenChange, domain, isEdit = false }: Dom
 										{/* Lookup Results */}
 										<div className="rounded-lg border p-4 space-y-2">
 											<h4 className="font-medium">Lookup Results</h4>
+											{lookupData.availability && (
+												<p className="text-sm">
+													Availability:{" "}
+													<span className={lookupData.availability === "available" ? "text-green-600 dark:text-green-400 font-medium" : ""}>
+														{lookupData.availability === "available" ? "Available for registration" : "Registered"}
+													</span>
+												</p>
+											)}
 											{lookupData.registrar_name && (
 												<p className="text-sm">Registrar: {lookupData.registrar_name}</p>
 											)}
