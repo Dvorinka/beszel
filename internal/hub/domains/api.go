@@ -124,8 +124,8 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 		SSLAlertEnabled bool     `json:"ssl_alert_enabled"`
 		SSLAlertDays    int      `json:"ssl_alert_days"`
 		MonitorType     string   `json:"monitor_type"`
-		NotifyOnExpiry  bool     `json:"notify_on_expiry"`
-		NotifyOnSSL     bool     `json:"notify_on_ssl_expiry"`
+		NotifyOnExpiry  *bool    `json:"notify_on_expiry"`
+		NotifyOnSSL     *bool    `json:"notify_on_ssl_expiry"`
 		NotifyOnDNS     bool     `json:"notify_on_dns_change"`
 		NotifyOnReg     bool     `json:"notify_on_registrar_change"`
 		// Manual expiry override when WHOIS fails
@@ -175,8 +175,10 @@ func (h *APIHandler) createDomain(e *core.RequestEvent) error {
 	record.Set("ssl_alert_enabled", req.SSLAlertEnabled)
 	record.Set("ssl_alert_days", req.SSLAlertDays)
 	record.Set("monitor_type", req.MonitorType)
-	record.Set("notify_on_expiry", req.NotifyOnExpiry)
-	record.Set("notify_on_ssl_expiry", req.NotifyOnSSL)
+	// Expiry and SSL-expiry alerts default on, matching the dialog defaults;
+	// change notifications stay opt-in. nil means the caller did not specify.
+	record.Set("notify_on_expiry", req.NotifyOnExpiry == nil || *req.NotifyOnExpiry)
+	record.Set("notify_on_ssl_expiry", req.NotifyOnSSL == nil || *req.NotifyOnSSL)
 	record.Set("notify_on_dns_change", req.NotifyOnDNS)
 	record.Set("notify_on_registrar_change", req.NotifyOnReg)
 	record.Set("user", authRecord.Id)
