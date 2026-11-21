@@ -678,6 +678,9 @@ func (h *APIHandler) recordToResponse(record *core.Record) map[string]interface{
 }
 
 func (h *APIHandler) applyLookupData(record *core.Record, domainData *domain.Domain) {
+	if domainData.Availability != "" {
+		record.Set("availability", domainData.Availability)
+	}
 	if domainData.ExpiryDate != nil && !domainData.ExpiryDate.IsZero() {
 		record.Set("expiry_date", *domainData.ExpiryDate)
 	}
